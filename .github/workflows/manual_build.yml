@@ -4,8 +4,17 @@ on:
 
 jobs:
   build:
-    name: Build Project
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, ubuntu-latest]
+        include:
+          - os: ubuntu-latest
+            os_short: linux
+          - os: ubuntu-20.04
+            os_short: oldlinux
+
+    name: Build Project ${{ matrix.os_short }}
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout Repository
@@ -74,7 +83,7 @@ jobs:
       - name: Upload Binary (Package)
         uses: actions/upload-artifact@v2
         with:
-          name: sendproxy
+          name: sendproxy-${{ matrix.os_short }}
           path: /home/runner/work/Left4SendProxy/Left4SendProxy/addons
 
   release:

@@ -63,6 +63,7 @@ class IServerGameEnts;
 
 void GlobalProxy(const SendProp *pProp, const void *pStructBase, const void* pData, DVariant *pOut, int iElement, int objectID);
 void GlobalProxyGamerules(const SendProp *pProp, const void *pStructBase, const void* pData, DVariant *pOut, int iElement, int objectID);
+bool DispatchCallGamerules(SendPropHookGamerules &hook, bool &bHandled, const SendProp *pProp, const void *pStructBase, const void *pData, DVariant *pOut, int iElement, int objectID);
 bool IsPropValid(SendProp *, PropType);
 char * strncpynull(char * pDestination, const char * pSource, size_t szCount);
 

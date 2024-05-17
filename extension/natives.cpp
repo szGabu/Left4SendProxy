@@ -533,7 +533,7 @@ static cell_t Native_HookArrayPropGamerules(IPluginContext * pContext, const cel
 	}
 	else if (pProp->GetType() == DPT_Array)
 	{
-		if (!st->GetArrayProp() || element > pProp->GetNumElements())
+		if (!pProp->GetArrayProp() || element > pProp->GetNumElements())
 			return pContext->ThrowNativeError("Could not find element %d in %s", element, info.prop->GetName());
 	}
 	else

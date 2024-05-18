@@ -1485,7 +1485,7 @@ void GlobalProxy(const SendProp *pProp, const void *pStructBase, const void * pD
 				}
 				case PropType::Prop_String:
 				{
-					const char * result = *(char **)pData;
+					const char * result = pData;
 					if (!result) //there can be null;
 						result = "";
 
@@ -1582,7 +1582,7 @@ void GlobalProxyGamerules(const SendProp *pProp, const void *pStructBase, const 
 				}
 				case PropType::Prop_String:
 				{
-					const char * result = *(char **)pData; //We need to use const because of C++11 restriction
+					const char *result = pData; //We need to use const because of C++11 restriction
 					if (!result) //there can be null;
 						result = "";
 

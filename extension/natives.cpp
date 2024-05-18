@@ -522,11 +522,9 @@ static cell_t Native_HookArrayPropGamerules(IPluginContext * pContext, const cel
 	if (!pProp)
 		return pContext->ThrowNativeError("Could not find prop %s", propName);
 
-	if (pProp->GetType() == DPT_DataTable)
+	if (pProp->GetDataTable())
 	{
 		SendTable * st = info.prop->GetDataTable();
-		if (!st)
-			return pContext->ThrowNativeError("Prop %s does not contain any elements", propName);
 
 		pProp = st->GetProp(element);
 		if (!pProp)

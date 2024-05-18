@@ -1418,82 +1418,162 @@ bool CallVectorGamerules(SendPropHookGamerules hook, Vector &vec)
 
 void GlobalProxy(const SendProp *pProp, const void *pStructBase, const void * pData, DVariant *pOut, int iElement, int objectID)
 {
+	unsigned char *pArrayData;
+	int iElemSize, iArraySize;
+	
+	if (pProp->GetType() == DPT_Array && pProp->GetArrayProp())
+	{
+		pArrayData = (unsigned char *)pData + pProp->GetArrayProp()->GetOffset();
+		iElemSize = pProp->GetElementStride();
+		iArraySize = pProp->GetNumElements();
+	}
+
 	edict_t * pEnt = gamehelpers->EdictOfIndex(objectID);
 	bool bHandled = false;
 	for (int i = 0; i < g_Hooks.Count(); i++)
 	{
 		if (g_Hooks[i].objectID == objectID && g_Hooks[i].pVar == pProp && pEnt == g_Hooks[i].pEnt)
 		{
-			switch (g_Hooks[i].PropType)
+			if (pProp->GetType() == DPT_Array)
 			{
-				case PropType::Prop_Int:
+				auto hook = g_HooksGamerules[i];
+				for (int e = 0; e < iArraySize; ++e)
 				{
-					int result = *(int *)pData;
+					switch (hook.PropType)
+					{
+						case PropType::Prop_Int:
+						{
+							int result = *(int *)(pArrayData + iElemSize * e);
 
-					if (CallInt(g_Hooks[i], &result))
-					{
-						long data = result;
-						g_Hooks[i].pRealProxy(pProp, pStructBase, &data, pOut, iElement, objectID);
-						return; // If somebody already handled this call, do not call other hooks for this entity & prop
+							if (CallInt(hook, &result))
+							{
+								long data = result;
+								hook.pRealProxy(pProp, pStructBase, &data, pOut, iElement, objectID);
+								return; // If somebody already handled this call, do not call other hooks for this entity & prop
+							}
+							bHandled = true;
+							continue;
+						}
+						case PropType::Prop_Float:
+						{
+							float result = *(float *)(pArrayData + iElemSize * e);
+
+							if (CallFloat(hook, &result))
+							{
+								hook.pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
+								return; // If somebody already handled this call, do not call other hooks for this entity & prop
+							} 
+							bHandled = true;
+							continue;
+						}
+						case PropType::Prop_String:
+						{
+							const char * result = *(char **)(pArrayData + iElemSize * e); //We need to use const because of C++11 restriction
+							if (!result) //there can be null;
+								result = "";
+
+							if (CallString(hook, const_cast<char **>(&result)), iElement)
+							{
+								hook.pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
+								return; // If somebody already handled this call, do not call other hooks for this entity & prop
+							}
+							bHandled = true;
+							continue;
+						}
+						case PropType::Prop_Vector:
+						{
+							Vector result = *(Vector *)(pArrayData + iElemSize * e);
+
+							if (CallVector(hook, result))
+							{
+								hook.pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
+								return; // If somebody already handled this call, do not call other hooks for this entity & prop
+							}
+							bHandled = true;
+							continue;
+						}
+						default: rootconsole->ConsolePrint("%s: SendProxy report: Unknown prop type (%s).", __func__, hook.pVar->GetName());
 					}
-					else
-					{
-						g_Hooks[i].pRealProxy(pProp, pStructBase, pData, pOut, iElement, objectID);
-					}
-					bHandled = true;
-					continue;
 				}
-				case PropType::Prop_Float:
+
+				if (bHandled)
 				{
-					float result = *(float *)pData;
-
-					if (CallFloat(g_Hooks[i], &result))
-					{
-						g_Hooks[i].pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
-						return; // If somebody already handled this call, do not call other hooks for this entity & prop
-					}
-					else
-					{
-						g_Hooks[i].pRealProxy(pProp, pStructBase, pData, pOut, iElement, objectID);
-					}
-					bHandled = true;
-					continue;
+					hook.pRealProxy(pProp, pStructBase, pData, pOut, iElement, objectID);
 				}
-				case PropType::Prop_String:
+			}
+			else
+			{
+				switch (g_Hooks[i].PropType)
 				{
-					const char * result = *(char **)pData;
-					if (!result) //there can be null;
-						result = "";
+					case PropType::Prop_Int:
+					{
+						int result = *(int *)pData;
 
-					if (CallString(g_Hooks[i], const_cast<char **>(&result)))
-					{
-						g_Hooks[i].pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
-						return; // If somebody already handled this call, do not call other hooks for this entity & prop
+						if (CallInt(g_Hooks[i], &result))
+						{
+							long data = result;
+							g_Hooks[i].pRealProxy(pProp, pStructBase, &data, pOut, iElement, objectID);
+							return; // If somebody already handled this call, do not call other hooks for this entity & prop
+						}
+						else
+						{
+							g_Hooks[i].pRealProxy(pProp, pStructBase, pData, pOut, iElement, objectID);
+						}
+						bHandled = true;
+						continue;
 					}
-					else
+					case PropType::Prop_Float:
 					{
-						g_Hooks[i].pRealProxy(pProp, pStructBase, pData, pOut, iElement, objectID);
-					}
-					bHandled = true;
-					continue;
-				}
-				case PropType::Prop_Vector:
-				{
-					Vector result = *(Vector *)pData;
+						float result = *(float *)pData;
 
-					if (CallVector(g_Hooks[i], result))
-					{
-						g_Hooks[i].pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
-						return; // If somebody already handled this call, do not call other hooks for this entity & prop
+						if (CallFloat(g_Hooks[i], &result))
+						{
+							g_Hooks[i].pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
+							return; // If somebody already handled this call, do not call other hooks for this entity & prop
+						}
+						else
+						{
+							g_Hooks[i].pRealProxy(pProp, pStructBase, pData, pOut, iElement, objectID);
+						}
+						bHandled = true;
+						continue;
 					}
-					else
+					case PropType::Prop_String:
 					{
-						g_Hooks[i].pRealProxy(pProp, pStructBase, pData, pOut, iElement, objectID);
+						const char * result = *(char **)pData;
+						if (!result) //there can be null;
+							result = "";
+
+						if (CallString(g_Hooks[i], const_cast<char **>(&result)))
+						{
+							g_Hooks[i].pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
+							return; // If somebody already handled this call, do not call other hooks for this entity & prop
+						}
+						else
+						{
+							g_Hooks[i].pRealProxy(pProp, pStructBase, pData, pOut, iElement, objectID);
+						}
+						bHandled = true;
+						continue;
 					}
-					bHandled = true;
-					continue;
+					case PropType::Prop_Vector:
+					{
+						Vector result = *(Vector *)pData;
+
+						if (CallVector(g_Hooks[i], result))
+						{
+							g_Hooks[i].pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
+							return; // If somebody already handled this call, do not call other hooks for this entity & prop
+						}
+						else
+						{
+							g_Hooks[i].pRealProxy(pProp, pStructBase, pData, pOut, iElement, objectID);
+						}
+						bHandled = true;
+						continue;
+					}
+					default: rootconsole->ConsolePrint("%s: SendProxy report: Unknown prop type (%s).", __func__, g_Hooks[i].pVar->GetName());
 				}
-				default: rootconsole->ConsolePrint("%s: SendProxy report: Unknown prop type (%s).", __func__, g_Hooks[i].pVar->GetName());
 			}
 		}
 	}

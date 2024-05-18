@@ -1047,12 +1047,15 @@ void CallChangeGamerulesCallbacks(PropChangeHookGamerules * pInfo, void * pOldVa
 
 //Proxy
 
-bool CallInt(SendPropHook hook, int *ret)
+bool CallInt(SendPropHook hook, int *ret, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
 	
 	AUTO_LOCK_FM(g_WorkMutex);
+
+	if (!hook.pVar->IsInsideArray())
+		iElement = hook.Element;
 
 	switch (hook.sCallbackInfo.iCallbackType)
 	{
@@ -1064,7 +1067,7 @@ bool CallInt(SendPropHook hook, int *ret)
 			callback->PushCell(hook.objectID);
 			callback->PushString(hook.pVar->GetName());
 			callback->PushCellByRef(&value);
-			callback->PushCell(hook.Element);
+			callback->PushCell(iElement);
 			callback->PushCell(g_iCurrentClientIndexInLoop + 1);
 			callback->Execute(&result);
 			if (result == Pl_Changed)
@@ -1078,7 +1081,7 @@ bool CallInt(SendPropHook hook, int *ret)
 		{
 			ISendProxyCallbacks * pCallbacks = (ISendProxyCallbacks *)hook.sCallbackInfo.pCallback;
 			int iValue = *ret;
-			bool bChange = pCallbacks->OnEntityPropProxyFunctionCalls(gameents->EdictToBaseEntity(hook.pEnt), hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&iValue, hook.PropType, hook.Element);
+			bool bChange = pCallbacks->OnEntityPropProxyFunctionCalls(gameents->EdictToBaseEntity(hook.pEnt), hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&iValue, hook.PropType, iElement);
 			if (bChange)
 			{
 				*ret = iValue;
@@ -1090,12 +1093,15 @@ bool CallInt(SendPropHook hook, int *ret)
 	return false;
 }
 
-bool CallIntGamerules(SendPropHookGamerules hook, int *ret)
+bool CallIntGamerules(SendPropHookGamerules hook, int *ret, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
 	
 	AUTO_LOCK_FM(g_WorkMutex);
+
+	if (!hook.pVar->IsInsideArray())
+		iElement = hook.Element;
 
 	switch (hook.sCallbackInfo.iCallbackType)
 	{
@@ -1106,7 +1112,7 @@ bool CallIntGamerules(SendPropHookGamerules hook, int *ret)
 			cell_t result = Pl_Continue;
 			callback->PushString(hook.pVar->GetName());
 			callback->PushCellByRef(&value);
-			callback->PushCell(hook.Element);
+			callback->PushCell(iElement);
 			callback->PushCell(g_iCurrentClientIndexInLoop + 1);
 			callback->Execute(&result);
 			if (result == Pl_Changed)
@@ -1120,7 +1126,7 @@ bool CallIntGamerules(SendPropHookGamerules hook, int *ret)
 		{
 			ISendProxyCallbacks * pCallbacks = (ISendProxyCallbacks *)hook.sCallbackInfo.pCallback;
 			int iValue = *ret;
-			bool bChange = pCallbacks->OnGamerulesPropProxyFunctionCalls(hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&iValue, hook.PropType, hook.Element);
+			bool bChange = pCallbacks->OnGamerulesPropProxyFunctionCalls(hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&iValue, hook.PropType, iElement);
 			if (bChange)
 			{
 				*ret = iValue;
@@ -1132,13 +1138,16 @@ bool CallIntGamerules(SendPropHookGamerules hook, int *ret)
 	return false;
 }
 
-bool CallFloat(SendPropHook hook, float *ret)
+bool CallFloat(SendPropHook hook, float *ret, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
 	
 	AUTO_LOCK_FM(g_WorkMutex);
 	
+	if (!hook.pVar->IsInsideArray())
+		iElement = hook.Element;
+
 	switch (hook.sCallbackInfo.iCallbackType)
 	{
 		case CallBackType::Callback_PluginFunction:
@@ -1149,7 +1158,7 @@ bool CallFloat(SendPropHook hook, float *ret)
 			callback->PushCell(hook.objectID);
 			callback->PushString(hook.pVar->GetName());
 			callback->PushFloatByRef(&value);
-			callback->PushCell(hook.Element);
+			callback->PushCell(iElement);
 			callback->PushCell(g_iCurrentClientIndexInLoop + 1);
 			callback->Execute(&result);
 			if (result == Pl_Changed)
@@ -1163,7 +1172,7 @@ bool CallFloat(SendPropHook hook, float *ret)
 		{
 			ISendProxyCallbacks * pCallbacks = (ISendProxyCallbacks *)hook.sCallbackInfo.pCallback;
 			float flValue = *ret;
-			bool bChange = pCallbacks->OnEntityPropProxyFunctionCalls(gameents->EdictToBaseEntity(hook.pEnt), hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&flValue, hook.PropType, hook.Element);
+			bool bChange = pCallbacks->OnEntityPropProxyFunctionCalls(gameents->EdictToBaseEntity(hook.pEnt), hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&flValue, hook.PropType, iElement);
 			if (bChange)
 			{
 				*ret = flValue;
@@ -1175,12 +1184,15 @@ bool CallFloat(SendPropHook hook, float *ret)
 	return false;
 }
 
-bool CallFloatGamerules(SendPropHookGamerules hook, float *ret)
+bool CallFloatGamerules(SendPropHookGamerules hook, float *ret, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
 	
 	AUTO_LOCK_FM(g_WorkMutex);
+
+	if (!hook.pVar->IsInsideArray())
+		iElement = hook.Element;
 
 	switch (hook.sCallbackInfo.iCallbackType)
 	{
@@ -1191,7 +1203,7 @@ bool CallFloatGamerules(SendPropHookGamerules hook, float *ret)
 			cell_t result = Pl_Continue;
 			callback->PushString(hook.pVar->GetName());
 			callback->PushFloatByRef(&value);
-			callback->PushCell(hook.Element);
+			callback->PushCell(iElement);
 			callback->PushCell(g_iCurrentClientIndexInLoop + 1);
 			callback->Execute(&result);
 			if (result == Pl_Changed)
@@ -1205,7 +1217,7 @@ bool CallFloatGamerules(SendPropHookGamerules hook, float *ret)
 		{
 			ISendProxyCallbacks * pCallbacks = (ISendProxyCallbacks *)hook.sCallbackInfo.pCallback;
 			float flValue = *ret;
-			bool bChange = pCallbacks->OnGamerulesPropProxyFunctionCalls(hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&flValue, hook.PropType, hook.Element);
+			bool bChange = pCallbacks->OnGamerulesPropProxyFunctionCalls(hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&flValue, hook.PropType, iElement);
 			if (bChange)
 			{
 				*ret = flValue;
@@ -1217,12 +1229,15 @@ bool CallFloatGamerules(SendPropHookGamerules hook, float *ret)
 	return false;
 }
 
-bool CallString(SendPropHook hook, char **ret)
+bool CallString(SendPropHook hook, char **ret, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
 	
 	AUTO_LOCK_FM(g_WorkMutex);
+
+	if (!hook.pVar->IsInsideArray())
+		iElement = hook.Element;
 
 	static char value[4096];
 	switch (hook.sCallbackInfo.iCallbackType)
@@ -1235,7 +1250,7 @@ bool CallString(SendPropHook hook, char **ret)
 			callback->PushCell(hook.objectID);
 			callback->PushString(hook.pVar->GetName());
 			callback->PushStringEx(value, 4096, SM_PARAM_STRING_UTF8 | SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
-			callback->PushCell(hook.Element);
+			callback->PushCell(iElement);
 			callback->PushCell(g_iCurrentClientIndexInLoop + 1);
 			callback->Execute(&result);
 			if (result == Pl_Changed)
@@ -1249,7 +1264,7 @@ bool CallString(SendPropHook hook, char **ret)
 		{
 			ISendProxyCallbacks * pCallbacks = (ISendProxyCallbacks *)hook.sCallbackInfo.pCallback;
 			strncpynull(value, *ret, 4096);
-			bool bChange = pCallbacks->OnEntityPropProxyFunctionCalls(gameents->EdictToBaseEntity(hook.pEnt), hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)value, hook.PropType, hook.Element);
+			bool bChange = pCallbacks->OnEntityPropProxyFunctionCalls(gameents->EdictToBaseEntity(hook.pEnt), hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)value, hook.PropType, iElement);
 			if (bChange)
 			{
 				*ret = value;
@@ -1261,12 +1276,15 @@ bool CallString(SendPropHook hook, char **ret)
 	return false;
 }
 
-bool CallStringGamerules(SendPropHookGamerules hook, char **ret)
+bool CallStringGamerules(SendPropHookGamerules hook, char **ret, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
 	
 	AUTO_LOCK_FM(g_WorkMutex);
+
+	if (!hook.pVar->IsInsideArray())
+		iElement = hook.Element;
 
 	static char value[4096];
 	switch (hook.sCallbackInfo.iCallbackType)
@@ -1284,7 +1302,7 @@ bool CallStringGamerules(SendPropHookGamerules hook, char **ret)
 			cell_t result = Pl_Continue;
 			callback->PushString(hook.pVar->GetName());
 			callback->PushStringEx(value, 4096, SM_PARAM_STRING_UTF8 | SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
-			callback->PushCell(hook.Element);
+			callback->PushCell(iElement);
 			callback->PushCell(g_iCurrentClientIndexInLoop + 1);
 			callback->Execute(&result);
 			if (result == Pl_Changed)
@@ -1301,7 +1319,7 @@ bool CallStringGamerules(SendPropHookGamerules hook, char **ret)
 				return false;
 			ISendProxyCallbacks * pCallbacks = (ISendProxyCallbacks *)hook.sCallbackInfo.pCallback;
 			strncpynull(value, *ret, 4096);
-			bool bChange = pCallbacks->OnGamerulesPropProxyFunctionCalls(hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)value, hook.PropType, hook.Element);
+			bool bChange = pCallbacks->OnGamerulesPropProxyFunctionCalls(hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)value, hook.PropType, iElement);
 			if (bChange)
 			{
 				*ret = value;
@@ -1313,12 +1331,15 @@ bool CallStringGamerules(SendPropHookGamerules hook, char **ret)
 	return false;
 }
 
-bool CallVector(SendPropHook hook, Vector &vec)
+bool CallVector(SendPropHook hook, Vector &vec, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
 	
 	AUTO_LOCK_FM(g_WorkMutex);
+
+	if (!hook.pVar->IsInsideArray())
+		iElement = hook.Element;
 
 	switch (hook.sCallbackInfo.iCallbackType)
 	{
@@ -1335,7 +1356,7 @@ bool CallVector(SendPropHook hook, Vector &vec)
 			callback->PushCell(hook.objectID);
 			callback->PushString(hook.pVar->GetName());
 			callback->PushArray(vector, 3, SM_PARAM_COPYBACK);
-			callback->PushCell(hook.Element);
+			callback->PushCell(iElement);
 			callback->PushCell(g_iCurrentClientIndexInLoop + 1);
 			callback->Execute(&result);
 			if (result == Pl_Changed)
@@ -1351,7 +1372,7 @@ bool CallVector(SendPropHook hook, Vector &vec)
 		{
 			ISendProxyCallbacks * pCallbacks = (ISendProxyCallbacks *)hook.sCallbackInfo.pCallback;
 			Vector vNewVec(vec.x, vec.y, vec.z);
-			bool bChange = pCallbacks->OnGamerulesPropProxyFunctionCalls(hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&vNewVec, hook.PropType, hook.Element);
+			bool bChange = pCallbacks->OnGamerulesPropProxyFunctionCalls(hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&vNewVec, hook.PropType, iElement);
 			if (bChange)
 			{
 				vec.x = vNewVec.x;
@@ -1365,12 +1386,15 @@ bool CallVector(SendPropHook hook, Vector &vec)
 	return false;
 }
 
-bool CallVectorGamerules(SendPropHookGamerules hook, Vector &vec)
+bool CallVectorGamerules(SendPropHookGamerules hook, Vector &vec, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
 	
 	AUTO_LOCK_FM(g_WorkMutex);
+
+	if (!hook.pVar->IsInsideArray())
+		iElement = hook.Element;
 
 	switch (hook.sCallbackInfo.iCallbackType)
 	{
@@ -1386,7 +1410,7 @@ bool CallVectorGamerules(SendPropHookGamerules hook, Vector &vec)
 			cell_t result = Pl_Continue;
 			callback->PushString(hook.pVar->GetName());
 			callback->PushArray(vector, 3, SM_PARAM_COPYBACK);
-			callback->PushCell(hook.Element);
+			callback->PushCell(iElement);
 			callback->PushCell(g_iCurrentClientIndexInLoop + 1);
 			callback->Execute(&result);
 			if (result == Pl_Changed)
@@ -1402,7 +1426,7 @@ bool CallVectorGamerules(SendPropHookGamerules hook, Vector &vec)
 		{
 			ISendProxyCallbacks * pCallbacks = (ISendProxyCallbacks *)hook.sCallbackInfo.pCallback;
 			Vector vNewVec(vec.x, vec.y, vec.z);
-			bool bChange = pCallbacks->OnGamerulesPropProxyFunctionCalls(hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&vNewVec, hook.PropType, hook.Element);
+			bool bChange = pCallbacks->OnGamerulesPropProxyFunctionCalls(hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&vNewVec, hook.PropType, iElement);
 			if (bChange)
 			{
 				vec.x = vNewVec.x;
@@ -1430,7 +1454,7 @@ void GlobalProxy(const SendProp *pProp, const void *pStructBase, const void * pD
 				{
 					int result = *(int *)pData;
 
-					if (CallInt(g_Hooks[i], &result))
+					if (CallInt(g_Hooks[i], &result, iElement))
 					{
 						long data = result;
 						g_Hooks[i].pRealProxy(pProp, pStructBase, &data, pOut, iElement, objectID);
@@ -1447,7 +1471,7 @@ void GlobalProxy(const SendProp *pProp, const void *pStructBase, const void * pD
 				{
 					float result = *(float *)pData;
 
-					if (CallFloat(g_Hooks[i], &result))
+					if (CallFloat(g_Hooks[i], &result, iElement))
 					{
 						g_Hooks[i].pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
 						return; // If somebody already handled this call, do not call other hooks for this entity & prop
@@ -1465,7 +1489,7 @@ void GlobalProxy(const SendProp *pProp, const void *pStructBase, const void * pD
 					if (!result) //there can be null;
 						result = "";
 
-					if (CallString(g_Hooks[i], const_cast<char **>(&result)))
+					if (CallString(g_Hooks[i], const_cast<char **>(&result), iElement))
 					{
 						g_Hooks[i].pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
 						return; // If somebody already handled this call, do not call other hooks for this entity & prop
@@ -1481,7 +1505,7 @@ void GlobalProxy(const SendProp *pProp, const void *pStructBase, const void * pD
 				{
 					Vector result = *(Vector *)pData;
 
-					if (CallVector(g_Hooks[i], result))
+					if (CallVector(g_Hooks[i], result, iElement))
 					{
 						g_Hooks[i].pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
 						return; // If somebody already handled this call, do not call other hooks for this entity & prop
@@ -1527,7 +1551,7 @@ void GlobalProxyGamerules(const SendProp *pProp, const void *pStructBase, const 
 				{
 					int result = *(int *)pData;
 
-					if (CallIntGamerules(g_HooksGamerules[i], &result))
+					if (CallIntGamerules(g_HooksGamerules[i], &result, iElement))
 					{
 						long data = result;
 						g_HooksGamerules[i].pRealProxy(pProp, pStructBase, &data, pOut, iElement, objectID);
@@ -1544,7 +1568,7 @@ void GlobalProxyGamerules(const SendProp *pProp, const void *pStructBase, const 
 				{
 					float result = *(float *)pData;
 
-					if (CallFloatGamerules(g_HooksGamerules[i], &result))
+					if (CallFloatGamerules(g_HooksGamerules[i], &result, iElement))
 					{
 						g_HooksGamerules[i].pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
 						return; // If somebody already handled this call, do not call other hooks for this entity & prop
@@ -1562,7 +1586,7 @@ void GlobalProxyGamerules(const SendProp *pProp, const void *pStructBase, const 
 					if (!result) //there can be null;
 						result = "";
 
-					if (CallStringGamerules(g_HooksGamerules[i], const_cast<char **>(&result)))
+					if (CallStringGamerules(g_HooksGamerules[i], const_cast<char **>(&result), iElement))
 					{
 						g_HooksGamerules[i].pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
 						return; // If somebody already handled this call, do not call other hooks for this entity & prop
@@ -1578,7 +1602,7 @@ void GlobalProxyGamerules(const SendProp *pProp, const void *pStructBase, const 
 				{
 					Vector result = *(Vector *)pData;
 
-					if (CallVectorGamerules(g_HooksGamerules[i], result))
+					if (CallVectorGamerules(g_HooksGamerules[i], result, iElement))
 					{
 						g_HooksGamerules[i].pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
 						return; // If somebody already handled this call, do not call other hooks for this entity & prop

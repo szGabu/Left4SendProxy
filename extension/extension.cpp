@@ -1588,7 +1588,7 @@ void GlobalProxyGamerules(const SendProp *pProp, const void *pStructBase, const 
 
 					if (CallStringGamerules(g_HooksGamerules[i], const_cast<char **>(&result), iElement))
 					{
-						g_HooksGamerules[i].pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
+						g_HooksGamerules[i].pRealProxy(pProp, pStructBase, result, pOut, iElement, objectID);
 						return; // If somebody already handled this call, do not call other hooks for this entity & prop
 					}
 					else

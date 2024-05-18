@@ -524,7 +524,7 @@ static cell_t Native_HookArrayPropGamerules(IPluginContext * pContext, const cel
 
 	if (pProp->GetDataTable())
 	{
-		SendTable * st = info.prop->GetDataTable();
+		SendTable * st = pProp->GetDataTable();
 
 		pProp = st->GetProp(element);
 		if (!pProp)
@@ -548,7 +548,7 @@ static cell_t Native_HookArrayPropGamerules(IPluginContext * pContext, const cel
 	else if (pProp->GetType() == DPT_Array)
 	{
 		if (!pProp->GetArrayProp() || element > pProp->GetNumElements())
-			return pContext->ThrowNativeError("Could not find element %d in %s", element, info.prop->GetName());
+			return pContext->ThrowNativeError("Could not find element %d in %s", element, pProp->GetName());
 		
 		if (!IsPropValid(pProp->GetArrayProp(), propType))
 			switch (propType)
@@ -598,7 +598,7 @@ static cell_t Native_HookArrayPropGamerules(IPluginContext * pContext, const cel
 	}
 	if (g_SendProxyManager.AddHookToListGamerules(hook))
 	{
-		pProp->SetProxyFn(GlobalProxy);
+		pProp->SetProxyFn(GlobalProxyGamerules);
 		return 1;
 	}
 	return 0;

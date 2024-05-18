@@ -517,6 +517,7 @@ static cell_t Native_HookArrayPropGamerules(IPluginContext * pContext, const cel
 	gamehelpers->FindSendPropInfo(g_szGameRulesProxy, propName, &info);
 
 	int element = params[2];
+	PropType propType = static_cast<PropType>(params[3]);
 	SendProp *pProp = info.prop;
 	if (!pProp)
 		return pContext->ThrowNativeError("Could not find prop %s", propName);
@@ -530,32 +531,46 @@ static cell_t Native_HookArrayPropGamerules(IPluginContext * pContext, const cel
 		pProp = st->GetProp(element);
 		if (!pProp)
 			return pContext->ThrowNativeError("Could not find element %d in %s", element, info.prop->GetName());
+		
+		if (!IsPropValid(pProp, propType))
+			switch (propType)
+			{
+				case PropType::Prop_Int: 
+					return pContext->ThrowNativeError("Prop %s is not an int!", pProp->GetName());
+				case PropType::Prop_Float:
+					return pContext->ThrowNativeError("Prop %s is not a float!", pProp->GetName());
+				case PropType::Prop_String:
+					return pContext->ThrowNativeError("Prop %s is not a string!", pProp->GetName());
+				case PropType::Prop_Vector:
+					return pContext->ThrowNativeError("Prop %s is not a vector!", pProp->GetName());
+				default:
+					return pContext->ThrowNativeError("Unsupported prop type %d", propType);
+			}
 	}
 	else if (pProp->GetType() == DPT_Array)
 	{
 		if (!pProp->GetArrayProp() || element > pProp->GetNumElements())
 			return pContext->ThrowNativeError("Could not find element %d in %s", element, info.prop->GetName());
+		
+		if (!IsPropValid(pProp->GetArrayProp(), propType))
+			switch (propType)
+			{
+				case PropType::Prop_Int: 
+					return pContext->ThrowNativeError("Prop %s is not an int!", pProp->GetName());
+				case PropType::Prop_Float:
+					return pContext->ThrowNativeError("Prop %s is not a float!", pProp->GetName());
+				case PropType::Prop_String:
+					return pContext->ThrowNativeError("Prop %s is not a string!", pProp->GetName());
+				case PropType::Prop_Vector:
+					return pContext->ThrowNativeError("Prop %s is not a vector!", pProp->GetName());
+				default:
+					return pContext->ThrowNativeError("Unsupported prop type %d", propType);
+			}
 	}
 	else
 	{
 		return pContext->ThrowNativeError("Prop %s does not contain any elements", propName);
 	}
-	
-	PropType propType = static_cast<PropType>(params[3]);
-	if (!IsPropValid(pProp, propType))
-		switch (propType)
-		{
-			case PropType::Prop_Int: 
-				return pContext->ThrowNativeError("Prop %s is not an int!", pProp->GetName());
-			case PropType::Prop_Float:
-				return pContext->ThrowNativeError("Prop %s is not a float!", pProp->GetName());
-			case PropType::Prop_String:
-				return pContext->ThrowNativeError("Prop %s is not a string!", pProp->GetName());
-			case PropType::Prop_Vector:
-				return pContext->ThrowNativeError("Prop %s is not a vector!", pProp->GetName());
-			default:
-				return pContext->ThrowNativeError("Unsupported prop type %d", propType);
-		}
 	
 	SendPropHookGamerules hook;
 	hook.sCallbackInfo.pCallback = (void *)pContext->GetFunctionById(params[4]);

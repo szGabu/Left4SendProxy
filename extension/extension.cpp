@@ -1491,7 +1491,7 @@ void GlobalProxy(const SendProp *pProp, const void *pStructBase, const void * pD
 
 					if (CallString(g_Hooks[i], const_cast<char **>(&result), iElement))
 					{
-						g_Hooks[i].pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
+						g_Hooks[i].pRealProxy(pProp, pStructBase, result, pOut, iElement, objectID);
 						return; // If somebody already handled this call, do not call other hooks for this entity & prop
 					}
 					else

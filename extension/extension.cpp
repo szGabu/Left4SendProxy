@@ -1436,7 +1436,7 @@ void GlobalProxy(const SendProp *pProp, const void *pStructBase, const void * pD
 		{
 			if (pProp->GetType() == DPT_Array)
 			{
-				auto hook = g_HooksGamerules[i];
+				auto hook = g_Hooks[i];
 				for (int e = 0; e < iArraySize; ++e)
 				{
 					switch (hook.PropType)

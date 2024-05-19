@@ -1229,7 +1229,7 @@ bool CallFloatGamerules(SendPropHookGamerules hook, float *ret, int iElement)
 	return false;
 }
 
-bool CallString(SendPropHook hook, char **ret, int iElement)
+bool CallString(SendPropHook hook, char **ret, int iElement, int maxlen = 0)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
@@ -1255,8 +1255,16 @@ bool CallString(SendPropHook hook, char **ret, int iElement)
 			callback->Execute(&result);
 			if (result == Pl_Changed)
 			{
-				*ret = value;
-				return true;
+				if (!hook.pVar->IsInsideArray())
+				{
+					*ret = value;
+					return true;
+				}
+				else
+				{
+					strncpynull(*ret, value, maxlen);
+					return true;
+				}
 			}
 			break;
 		}
@@ -1276,7 +1284,7 @@ bool CallString(SendPropHook hook, char **ret, int iElement)
 	return false;
 }
 
-bool CallStringGamerules(SendPropHookGamerules hook, char **ret, int iElement)
+bool CallStringGamerules(SendPropHookGamerules hook, char **ret, int iElement, int maxlen = 0)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
@@ -1307,8 +1315,16 @@ bool CallStringGamerules(SendPropHookGamerules hook, char **ret, int iElement)
 			callback->Execute(&result);
 			if (result == Pl_Changed)
 			{
-				*ret = value;
-				return true;
+				if (!hook.pVar->IsInsideArray())
+				{
+					*ret = value;
+					return true;
+				}
+				else
+				{
+					strncpynull(*ret, value, maxlen);
+					return true;
+				}
 			}
 			break;
 		}

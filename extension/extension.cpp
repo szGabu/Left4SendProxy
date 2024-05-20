@@ -1446,7 +1446,7 @@ void GlobalProxy(const SendProp *pProp, const void *pStructBase, const void * pD
 	bool bHandled = false;
 	for (int i = 0; i < g_Hooks.Count(); i++)
 	{
-		if (g_Hooks[i].objectID == objectID && g_Hooks[i].pVar == pProp && pEnt == g_Hooks[i].pEnt && (!pProp->GetArrayProp() || g_Hooks[i].Element == iElement))
+		if (g_Hooks[i].objectID == objectID && g_Hooks[i].pVar == pProp && pEnt == g_Hooks[i].pEnt && (pProp->GetType() != DPT_Array || g_Hooks[i].Element == iElement))
 		{
 			switch (g_Hooks[i].PropType)
 			{
@@ -1544,7 +1544,7 @@ void GlobalProxyGamerules(const SendProp *pProp, const void *pStructBase, const 
 	bool bHandled = false;
 	for (int i = 0; i < g_HooksGamerules.Count(); i++)
 	{
-		if (g_HooksGamerules[i].pVar == pProp && (!pProp->GetArrayProp() || g_HooksGamerules[i].Element == iElement))
+		if (g_HooksGamerules[i].pVar == pProp && (pProp->GetType() != DPT_Array || g_HooksGamerules[i].Element == iElement))
 		{
 			switch (g_HooksGamerules[i].PropType)
 			{

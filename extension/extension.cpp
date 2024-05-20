@@ -315,7 +315,7 @@ DETOUR_DECL_STATIC3(SV_ComputeClientPacks, void, int, iClientCount, CGameClient 
 		if (pEdict && !(pEdict->m_fStateFlags & FL_EDICT_CHANGED))
 			pEdict->m_fStateFlags |= FL_EDICT_CHANGED;
 	}
-	if (g_bShouldChangeGameRulesState && g_pGameRulesProxyEdict)
+	if (/*g_bShouldChangeGameRulesState*/g_HooksGamerules.Count() && g_pGameRulesProxyEdict)
 	{
 		if (!(g_pGameRulesProxyEdict->m_fStateFlags & FL_EDICT_CHANGED))
 			g_pGameRulesProxyEdict->m_fStateFlags |= FL_EDICT_CHANGED;

@@ -1446,7 +1446,7 @@ void GlobalProxy(const SendProp *pProp, const void *pStructBase, const void * pD
 	bool bHandled = false;
 	for (int i = 0; i < g_Hooks.Count(); i++)
 	{
-		if (g_Hooks[i].objectID == objectID && g_Hooks[i].pVar == pProp && pEnt == g_Hooks[i].pEnt)
+		if (g_Hooks[i].objectID == objectID && g_Hooks[i].pVar == pProp && pEnt == g_Hooks[i].pEnt && (!pProp->GetArrayProp() || g_Hooks[i].Element == iElement))
 		{
 			switch (g_Hooks[i].PropType)
 			{
@@ -1540,10 +1540,11 @@ void GlobalProxyGamerules(const SendProp *pProp, const void *pStructBase, const 
 {
 	if (!g_bShouldChangeGameRulesState)
 		g_bShouldChangeGameRulesState = true; //If this called once, so, the props wants to be sent at this time, and we should do this for all clients!
+	
 	bool bHandled = false;
 	for (int i = 0; i < g_HooksGamerules.Count(); i++)
 	{
-		if (g_HooksGamerules[i].pVar == pProp)
+		if (g_HooksGamerules[i].pVar == pProp && (!pProp->GetArrayProp() || g_HooksGamerules[i].Element == iElement))
 		{
 			switch (g_HooksGamerules[i].PropType)
 			{

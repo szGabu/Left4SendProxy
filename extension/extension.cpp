@@ -581,6 +581,11 @@ void SendProxyManager::SDK_OnUnload()
 		g_Hooks[i].pVar->SetProxyFn(g_Hooks[i].pRealProxy);
 	}
 	
+	for (int i = 0; i < g_HooksGamerules.Count(); i++)
+	{
+		g_HooksGamerules[i].pVar->SetProxyFn(g_HooksGamerules[i].pRealProxy);
+	}
+	
 	SH_REMOVE_HOOK(IServerGameClients, ClientDisconnect, gameclients, SH_STATIC(Hook_ClientDisconnect), false);
 	SH_REMOVE_HOOK(IServerGameDLL, GameFrame, gamedll, SH_STATIC(Hook_GameFrame), false);
 	if (!g_bFirstTimeCalled)
@@ -1626,7 +1631,7 @@ void GlobalProxyGamerules(const SendProp *pProp, const void *pStructBase, const 
 		{
 			if (g_HooksGamerules[i].pVar == pProp)
 			{
-				g_Hooks[i].pRealProxy(pProp, pStructBase, pData, pOut, iElement, objectID);
+				g_HooksGamerules[i].pRealProxy(pProp, pStructBase, pData, pOut, iElement, objectID);
 				return;
 			}
 		}

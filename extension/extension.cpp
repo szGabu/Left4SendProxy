@@ -172,7 +172,7 @@ DETOUR_DECL_MEMBER2(CFrameSnapshotManager_GetPreviouslySentPacket, PackedEntity*
 	}
 
 	if (g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop] == INVALID_PACKED_ENTITY_HANDLE)
-		return false;
+		return NULL;
 
 	CFrameSnapshotManager *framesnapshotmanager = (CFrameSnapshotManager *)this;
 	PackedEntityHandle_t origHandle = framesnapshotmanager->m_pPackedData[entity];

@@ -59,6 +59,10 @@ SH_DECL_HOOK0(IServer, GetClientCount, const, false, int);
 
 DECL_DETOUR(CGameServer_SendClientMessages);
 DECL_DETOUR(CGameClient_ShouldSendMessages);
+DECL_DETOUR(CFrameSnapshotManager_UsePreviouslySentPacket);
+DECL_DETOUR(CFrameSnapshotManager_GetPreviouslySentPacket);
+DECL_DETOUR(CFrameSnapshotManager_CreatePackedEntity);
+DECL_DETOUR(CFrameSnapshotManager_RemoveEntityReference);
 DECL_DETOUR(SV_ComputeClientPacks);
 
 class CGameClient;
@@ -97,6 +101,8 @@ ConVar * sv_parallel_packentities = nullptr;
 ConVar * sv_parallel_sendsnapshot = nullptr;
 
 edict_t * g_pGameRulesProxyEdict = nullptr;
+int g_iGameRulesProxyIndex = -1;
+PackedEntityHandle_t g_PlayersPackedGameRules[65] = {INVALID_PACKED_ENTITY_HANDLE, ...};
 void * g_pGameRules = nullptr;
 bool g_bShouldChangeGameRulesState = false;
 bool g_bSendSnapshots = false;
@@ -121,6 +127,76 @@ const char * g_szGameRulesProxy;
 	6. SendTable_EncodeProp //here the ProxyFn will be called
 	7. ProxyFn //here our callbacks is called
 */
+
+DETOUR_DECL_MEMBER3(CFrameSnapshotManager_UsePreviouslySentPacket, bool, CFrameSnapshot*, pSnapshot, int, entity, int, entSerialNumber)
+{
+	if (g_iCurrentClientIndexInLoop == -1
+	 || entity != g_iGameRulesProxyIndex
+	 || g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop] == INVALID_PACKED_ENTITY_HANDLE)
+	{
+		return DETOUR_MEMBER_CALL(CFrameSnapshotManager_UsePreviouslySentPacket)(pSnapshot, entity, entSerialNumber);
+	}
+
+	CFrameSnapshotManager *framesnapshotmanager = (CFrameSnapshotManager *)this;
+	PackedEntityHandle_t origHandle = framesnapshotmanager->m_pPackedData[entity];
+
+	framesnapshotmanager->m_pPackedData[entity] = g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop];
+	bool result = DETOUR_MEMBER_CALL(CFrameSnapshotManager_UsePreviouslySentPacket)(pSnapshot, entity, entSerialNumber);
+	framesnapshotmanager->m_pPackedData[entity] = origHandle;
+
+	return result;
+}
+
+DETOUR_DECL_MEMBER2(CFrameSnapshotManager_GetPreviouslySentPacket, PackedEntity*, int, entity, int, entSerialNumber)
+{
+	if (g_iCurrentClientIndexInLoop == -1
+	 || entity != g_iGameRulesProxyIndex
+	 || g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop] == INVALID_PACKED_ENTITY_HANDLE)
+	{
+		return DETOUR_MEMBER_CALL(CFrameSnapshotManager_GetPreviouslySentPacket)(entity, entSerialNumber);
+	}
+
+	CFrameSnapshotManager *framesnapshotmanager = (CFrameSnapshotManager *)this;
+	PackedEntityHandle_t origHandle = framesnapshotmanager->m_pPackedData[entity];
+
+	framesnapshotmanager->m_pPackedData[entity] = g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop];
+	PackedEntity *result = DETOUR_MEMBER_CALL(CFrameSnapshotManager_GetPreviouslySentPacket)(entity, entSerialNumber);
+	framesnapshotmanager->m_pPackedData[entity] = origHandle;
+
+	return result;
+}
+
+DETOUR_DECL_MEMBER2(CFrameSnapshotManager_CreatePackedEntity, PackedEntity*, CFrameSnapshot*, pSnapshot, int, entity)
+{
+	if (g_iCurrentClientIndexInLoop == -1
+	 || entity != g_iGameRulesProxyIndex)
+	{
+		return DETOUR_MEMBER_CALL(CFrameSnapshotManager_CreatePackedEntity)(pSnapshot, entity);
+	}
+
+	CFrameSnapshotManager *framesnapshotmanager = (CFrameSnapshotManager *)this;
+	PackedEntityHandle_t origHandle = framesnapshotmanager->m_pPackedData[entity];
+
+	framesnapshotmanager->m_pPackedData[entity] = g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop];
+	PackedEntity *result = DETOUR_MEMBER_CALL(CFrameSnapshotManager_CreatePackedEntity)(pSnapshot, entity);
+
+	g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop] = framesnapshotmanager->m_pPackedData[entity];
+
+	return result;
+}
+
+DETOUR_DECL_MEMBER2(CFrameSnapshotManager_RemoveEntityReference, void, PackedEntityHandle_t, handle)
+{
+	for (int i = 0; i < sizeof(g_PlayersPackedGameRules); ++i)
+	{
+		if (g_PlayersPackedGameRules[i] == handle)
+		{
+			g_PlayersPackedGameRules[i] = INVALID_PACKED_ENTITY_HANDLE;
+		}
+	}
+
+	return DETOUR_MEMBER_CALL(CFrameSnapshotManager_RemoveEntityReference);
+}
 
 DETOUR_DECL_MEMBER1(CGameServer_SendClientMessages, void, bool, bSendSnapshots)
 {
@@ -315,7 +391,7 @@ DETOUR_DECL_STATIC3(SV_ComputeClientPacks, void, int, iClientCount, CGameClient 
 		if (pEdict && !(pEdict->m_fStateFlags & FL_EDICT_CHANGED))
 			pEdict->m_fStateFlags |= FL_EDICT_CHANGED;
 	}
-	if (/*g_bShouldChangeGameRulesState*/g_HooksGamerules.Count() && g_pGameRulesProxyEdict)
+	if (g_bShouldChangeGameRulesState && g_pGameRulesProxyEdict)
 	{
 		if (!(g_pGameRulesProxyEdict->m_fStateFlags & FL_EDICT_CHANGED))
 			g_pGameRulesProxyEdict->m_fStateFlags |= FL_EDICT_CHANGED;
@@ -539,6 +615,10 @@ bool SendProxyManager::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	bool bDetoursInited = false;
 	CREATE_DETOUR(CGameServer_SendClientMessages, "CGameServer::SendClientMessages", bDetoursInited);
 	CREATE_DETOUR(CGameClient_ShouldSendMessages, "CGameClient::ShouldSendMessages", bDetoursInited);
+	CREATE_DETOUR(CFrameSnapshotManager_UsePreviouslySentPacket, "CFrameSnapshotManager::UsePreviouslySentPacket", bDetoursInited);
+	CREATE_DETOUR(CFrameSnapshotManager_GetPreviouslySentPacket, "CFrameSnapshotManager::GetPreviouslySentPacket", bDetoursInited);
+	CREATE_DETOUR(CFrameSnapshotManager_CreatePackedEntity, "CFrameSnapshotManager::CreatePackedEntity", bDetoursInited);
+	CREATE_DETOUR(CFrameSnapshotManager_RemoveEntityReference, "CFrameSnapshotManager::RemoveEntityReference", bDetoursInited);
 	CREATE_DETOUR_STATIC(SV_ComputeClientPacks, "SV_ComputeClientPacks", bDetoursInited);
 	
 	if (!bDetoursInited)
@@ -613,8 +693,17 @@ void SendProxyManager::OnCoreMapEnd()
 		UnhookProxyGamerules(i);
 		i--;
 	}
+
+	for (int i = 0; i < sizeof(g_PlayersPackedGameRules); ++i)
+	{
+		if (g_PlayersPackedGameRules[i] == handle)
+		{
+			g_PlayersPackedGameRules[i] = INVALID_PACKED_ENTITY_HANDLE;
+		}
+	}
 	
 	g_pGameRulesProxyEdict = nullptr;
+	g_iGameRulesProxyIndex = -1;
 }
 
 void SendProxyManager::OnCoreMapStart(edict_t * pEdictList, int edictCount, int clientMax)
@@ -628,6 +717,11 @@ void SendProxyManager::OnCoreMapStart(edict_t * pEdictList, int edictCount, int 
 	g_pGameRulesProxyEdict = gameents->BaseEntityToEdict(pGameRulesProxyEnt);
 	if (!g_pGameRulesProxyEdict)
 		smutils->LogError(myself, "Unable to get gamerules proxy ent (2)!");
+	
+	if (g_pGameRulesProxyEdict)
+	{
+		g_iGameRulesProxyIndex = gamehelpers->IndexOfEdict(g_pGameRulesProxyEdict);
+	}
 }
 
 bool SendProxyManager::SDK_OnMetamodLoad(ISmmAPI *ismm, char *error, size_t maxlen, bool late)

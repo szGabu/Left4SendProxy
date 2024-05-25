@@ -207,7 +207,10 @@ DETOUR_DECL_MEMBER1(CFrameSnapshotManager_RemoveEntityReference, void, PackedEnt
 		}
 	}
 
-	gamehelpers->TextMsg(g_iCurrentClientIndexInLoop, 3, "RemoveEntityReference");
+	if (g_iCurrentClientIndexInLoop != -1)
+	{
+		gamehelpers->TextMsg(g_iCurrentClientIndexInLoop, 3, "RemoveEntityReference");
+	}
 
 	return DETOUR_MEMBER_CALL(CFrameSnapshotManager_RemoveEntityReference)(handle);
 }
@@ -687,6 +690,10 @@ void SendProxyManager::SDK_OnUnload()
 
 	DESTROY_DETOUR(CGameServer_SendClientMessages);
 	DESTROY_DETOUR(CGameClient_ShouldSendMessages);
+	DESTROY_DETOUR(CFrameSnapshotManager_UsePreviouslySentPacket);
+	DESTROY_DETOUR(CFrameSnapshotManager_GetPreviouslySentPacket);
+	DESTROY_DETOUR(CFrameSnapshotManager_CreatePackedEntity);
+	DESTROY_DETOUR(CFrameSnapshotManager_RemoveEntityReference);
 	DESTROY_DETOUR(SV_ComputeClientPacks);
 	
 	gameconfs->CloseGameConfigFile(g_pGameConf);

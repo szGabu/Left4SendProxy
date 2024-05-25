@@ -17,7 +17,11 @@ public:
 	virtual ~CFrameSnapshotManager( void );
 
 public:
-	int pad[39];
+	int pad[22];
+
+	CUtlFixedLinkedList<PackedEntity *>					m_PackedEntities;
+
+	int pad2[6];
 
 	// The most recently sent packets for each entity
 	PackedEntityHandle_t	m_pPackedData[ MAX_EDICTS ];

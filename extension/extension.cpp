@@ -204,12 +204,11 @@ DETOUR_DECL_MEMBER1(CFrameSnapshotManager_RemoveEntityReference, void, PackedEnt
 		if (g_PlayersPackedGameRules[i] == handle)
 		{
 			g_PlayersPackedGameRules[i] = INVALID_PACKED_ENTITY_HANDLE;
-		}
-	}
 
-	if (g_iCurrentClientIndexInLoop != -1)
-	{
-		gamehelpers->TextMsg(g_iCurrentClientIndexInLoop+1, 3, "RemoveEntityReference");
+			IGamePlayer *plr = playerhelpers->GetGamePlayer(i + 1);
+			if (plr && plr->IsInGame() && !plr->IsFakeClient())
+				gamehelpers->TextMsg(i+1, 3, "RemoveEntityReference");
+		}
 	}
 
 	return DETOUR_MEMBER_CALL(CFrameSnapshotManager_RemoveEntityReference)(handle);

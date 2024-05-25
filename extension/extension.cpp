@@ -206,8 +206,8 @@ DETOUR_DECL_MEMBER1(CFrameSnapshotManager_RemoveEntityReference, void, PackedEnt
 			g_PlayersPackedGameRules[i] = INVALID_PACKED_ENTITY_HANDLE;
 
 			IGamePlayer *plr = playerhelpers->GetGamePlayer(i + 1);
-			if (plr && plr->IsInGame() && !plr->IsFakeClient())
-				gamehelpers->TextMsg(i+1, 3, "RemoveEntityReference");
+			if (plr && plr->IsInGame())
+				smutils->LogMessage(myself, "RemoveEntityReference: %s", plr->GetName());
 		}
 	}
 

@@ -102,7 +102,7 @@ ConVar * sv_parallel_sendsnapshot = nullptr;
 
 edict_t * g_pGameRulesProxyEdict = nullptr;
 int g_iGameRulesProxyIndex = -1;
-PackedEntityHandle_t g_PlayersPackedGameRules[65] = {INVALID_PACKED_ENTITY_HANDLE, ...};
+PackedEntityHandle_t g_PlayersPackedGameRules[65] = {INVALID_PACKED_ENTITY_HANDLE}
 void * g_pGameRules = nullptr;
 bool g_bShouldChangeGameRulesState = false;
 bool g_bSendSnapshots = false;
@@ -195,7 +195,7 @@ DETOUR_DECL_MEMBER1(CFrameSnapshotManager_RemoveEntityReference, void, PackedEnt
 		}
 	}
 
-	return DETOUR_MEMBER_CALL(CFrameSnapshotManager_RemoveEntityReference);
+	return DETOUR_MEMBER_CALL(CFrameSnapshotManager_RemoveEntityReference)(handle);
 }
 
 DETOUR_DECL_MEMBER1(CGameServer_SendClientMessages, void, bool, bSendSnapshots)
@@ -696,10 +696,7 @@ void SendProxyManager::OnCoreMapEnd()
 
 	for (int i = 0; i < sizeof(g_PlayersPackedGameRules); ++i)
 	{
-		if (g_PlayersPackedGameRules[i] == handle)
-		{
-			g_PlayersPackedGameRules[i] = INVALID_PACKED_ENTITY_HANDLE;
-		}
+		g_PlayersPackedGameRules[i] = INVALID_PACKED_ENTITY_HANDLE;
 	}
 	
 	g_pGameRulesProxyEdict = nullptr;

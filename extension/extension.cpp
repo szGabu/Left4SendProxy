@@ -215,21 +215,25 @@ DETOUR_DECL_MEMBER2(CFrameSnapshotManager_CreatePackedEntity, PackedEntity*, CFr
 
 DETOUR_DECL_MEMBER1(CFrameSnapshotManager_RemoveEntityReference, void, PackedEntityHandle_t, handle)
 {
-	for (int i = 0; i < sizeof(g_PlayersPackedGameRules); ++i)
-	{
-		if (g_PlayersPackedGameRules[i] == handle)
-		{
-			g_PlayersPackedGameRules[i] = INVALID_PACKED_ENTITY_HANDLE;
+	DETOUR_MEMBER_CALL(CFrameSnapshotManager_RemoveEntityReference)(handle);
 
-		#ifdef DEBUG
-			IGamePlayer *plr = playerhelpers->GetGamePlayer(i + 1);
-			if (plr && plr->IsInGame())
-				smutils->LogMessage(myself, "RemoveEntityReference: %s", plr->GetName());
-		#endif
+	CFrameSnapshotManager *framesnapshotmanager = (CFrameSnapshotManager *)this;
+	if (framesnapshotmanager->m_pPackedData[entity] == INVALID_PACKED_ENTITY_HANDLE)
+	{
+		for (int i = 0; i < sizeof(g_PlayersPackedGameRules); ++i)
+		{
+			if (g_PlayersPackedGameRules[i] == handle)
+			{
+				g_PlayersPackedGameRules[i] = INVALID_PACKED_ENTITY_HANDLE;
+
+			#ifdef DEBUG
+				IGamePlayer *plr = playerhelpers->GetGamePlayer(i + 1);
+				if (plr && plr->IsInGame())
+					smutils->LogMessage(myself, "RemoveEntityReference: %s", plr->GetName());
+			#endif
+			}
 		}
 	}
-
-	return DETOUR_MEMBER_CALL(CFrameSnapshotManager_RemoveEntityReference)(handle);
 }
 
 #ifdef _FORCE_DEBUG

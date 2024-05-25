@@ -220,7 +220,7 @@ DETOUR_DECL_MEMBER1(CFrameSnapshotManager_RemoveEntityReference, void, PackedEnt
 	CFrameSnapshotManager *framesnapshotmanager = (CFrameSnapshotManager *)this;
 	if (framesnapshotmanager->m_PackedEntities[handle] == NULL)
 	{
-		for (int i = 0; i < sizeof(g_PlayersPackedGameRules); ++i)
+		for (int i = 0; i < (sizeof(g_PlayersPackedGameRules) / sizeof(g_PlayersPackedGameRules[0])); ++i)
 		{
 			if (g_PlayersPackedGameRules[i] == handle)
 			{
@@ -740,7 +740,7 @@ void SendProxyManager::OnCoreMapEnd()
 		i--;
 	}
 
-	for (int i = 0; i < sizeof(g_PlayersPackedGameRules); ++i)
+	for (int i = 0; i < sizeof(g_PlayersPackedGameRules) / sizeof(g_PlayersPackedGameRules[0]); ++i)
 	{
 		g_PlayersPackedGameRules[i] = INVALID_PACKED_ENTITY_HANDLE;
 	}

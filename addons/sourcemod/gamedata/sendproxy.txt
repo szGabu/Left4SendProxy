@@ -25,6 +25,26 @@
 				"library"			"engine"
 				"linux"				"@_Z21SV_ComputeClientPacksiPP11CGameClientP14CFrameSnapshot"
 			}
+			"CFrameSnapshotManager::UsePreviouslySentPacket"
+			{
+				"library"			"engine"
+				"linux"				"@_ZN21CFrameSnapshotManager23UsePreviouslySentPacketEP14CFrameSnapshotii"
+			}
+			"CFrameSnapshotManager::GetPreviouslySentPacket"
+			{
+				"library"			"engine"
+				"linux"				"@_ZN21CFrameSnapshotManager23GetPreviouslySentPacketEii"
+			}
+			"CFrameSnapshotManager::CreatePackedEntity"
+			{
+				"library"			"engine"
+				"linux"				"@_ZN21CFrameSnapshotManager18CreatePackedEntityEP14CFrameSnapshoti"
+			}
+			"CFrameSnapshotManager::RemoveEntityReference"
+			{
+				"library"			"engine"
+				"linux"				"@_ZN21CFrameSnapshotManager21RemoveEntityReferenceEi"
+			}
 		}
 	}
 	"tf"

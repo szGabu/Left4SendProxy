@@ -144,6 +144,10 @@ DETOUR_DECL_MEMBER3(CFrameSnapshotManager_UsePreviouslySentPacket, bool, CFrameS
 	bool result = DETOUR_MEMBER_CALL(CFrameSnapshotManager_UsePreviouslySentPacket)(pSnapshot, entity, entSerialNumber);
 	framesnapshotmanager->m_pPackedData[entity] = origHandle;
 
+	char buffer[128];
+	smutils->Format(buffer, sizeof(buffer), "UsePreviouslySentPacket (%d / %d)", origHandle, g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop]);
+	gamehelpers->TextMsg(g_iCurrentClientIndexInLoop, 3, buffer);
+
 	return result;
 }
 
@@ -162,6 +166,10 @@ DETOUR_DECL_MEMBER2(CFrameSnapshotManager_GetPreviouslySentPacket, PackedEntity*
 	framesnapshotmanager->m_pPackedData[entity] = g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop];
 	PackedEntity *result = DETOUR_MEMBER_CALL(CFrameSnapshotManager_GetPreviouslySentPacket)(entity, entSerialNumber);
 	framesnapshotmanager->m_pPackedData[entity] = origHandle;
+
+	char buffer[128];
+	smutils->Format(buffer, sizeof(buffer), "GetPreviouslySentPacket (%d / %d)", origHandle, g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop]);
+	gamehelpers->TextMsg(g_iCurrentClientIndexInLoop, 3, buffer);
 
 	return result;
 }
@@ -182,6 +190,10 @@ DETOUR_DECL_MEMBER2(CFrameSnapshotManager_CreatePackedEntity, PackedEntity*, CFr
 
 	g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop] = framesnapshotmanager->m_pPackedData[entity];
 
+	char buffer[128];
+	smutils->Format(buffer, sizeof(buffer), "CreatePackedEntity (%d / %d)", framesnapshotmanager->m_pPackedData[entity], g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop]);
+	gamehelpers->TextMsg(g_iCurrentClientIndexInLoop, 3, buffer);
+
 	return result;
 }
 
@@ -194,6 +206,8 @@ DETOUR_DECL_MEMBER1(CFrameSnapshotManager_RemoveEntityReference, void, PackedEnt
 			g_PlayersPackedGameRules[i] = INVALID_PACKED_ENTITY_HANDLE;
 		}
 	}
+
+	gamehelpers->TextMsg(g_iCurrentClientIndexInLoop, 3, "RemoveEntityReference");
 
 	return DETOUR_MEMBER_CALL(CFrameSnapshotManager_RemoveEntityReference)(handle);
 }

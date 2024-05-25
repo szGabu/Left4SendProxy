@@ -185,7 +185,7 @@ DETOUR_DECL_MEMBER2(CFrameSnapshotManager_CreatePackedEntity, PackedEntity*, CFr
 	return result;
 }
 
-DETOUR_DECL_MEMBER2(CFrameSnapshotManager_RemoveEntityReference, void, PackedEntityHandle_t, handle)
+DETOUR_DECL_MEMBER1(CFrameSnapshotManager_RemoveEntityReference, void, PackedEntityHandle_t, handle)
 {
 	for (int i = 0; i < sizeof(g_PlayersPackedGameRules); ++i)
 	{

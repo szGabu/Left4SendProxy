@@ -1,14 +1,26 @@
 #ifndef _WRAPPERS_H_INC_
 #define _WRAPPERS_H_INC_
 
-#include "tier1.h"
+#include "tier0/threadtools.h"
+#include "tier1/utlvector.h"
+#include "tier1/utllinkedlist.h"
+#include "tier1/mempool.h"
 
 class CHLTVEntityData;
 class CEventInfo;
 class CFrameSnapshotEntry;
 
+class PackedEntity;
 #define INVALID_PACKED_ENTITY_HANDLE (0)
 typedef int PackedEntityHandle_t;
+
+typedef struct
+{
+	PackedEntity	*pEntity;	// original packed entity
+	int				counter;	// increaseing counter to find LRU entries
+	int				bits;		// uncompressed data length in bits
+	char			data[MAX_PACKEDENTITY_DATA]; // uncompressed data cache
+} UnpackedDataCache_t;
 
 class CFrameSnapshot
 {
@@ -40,7 +52,6 @@ private:
 	CInterlockedInt			m_nReferences;
 };
 
-class PackedEntity;
 class CFrameSnapshotManager
 {
 	friend class CFrameSnapshot;
@@ -52,7 +63,7 @@ public:
 	// Called when a level change happens
 	virtual void			LevelChanged();
 
-private:
+public:
 	CUtlLinkedList<CFrameSnapshot*, unsigned short>		m_FrameSnapshots;
 	CClassMemoryPool< PackedEntity >					m_PackedEntitiesPool;
 	CUtlFixedLinkedList<PackedEntity *>					m_PackedEntities; 

@@ -128,23 +128,33 @@ const char * g_szGameRulesProxy;
 	7. ProxyFn //here our callbacks is called
 */
 
+#ifndef DEBUG
+#define _FORCE_DEBUG
+
+#ifdef _FORCE_DEBUG
+#define DEBUG
+#endif
+
+#endif // #ifndef DEBUG
+
 DETOUR_DECL_MEMBER3(CFrameSnapshotManager_UsePreviouslySentPacket, bool, CFrameSnapshot*, pSnapshot, int, entity, int, entSerialNumber)
 {
 	if (g_iCurrentClientIndexInLoop == -1
-	 || entity != g_iGameRulesProxyIndex
-	 || g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop] == INVALID_PACKED_ENTITY_HANDLE)
+	 || entity != g_iGameRulesProxyIndex)
 	{
 		return DETOUR_MEMBER_CALL(CFrameSnapshotManager_UsePreviouslySentPacket)(pSnapshot, entity, entSerialNumber);
 	}
+
+	if (g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop] == INVALID_PACKED_ENTITY_HANDLE)
+		return false;
 
 	CFrameSnapshotManager *framesnapshotmanager = (CFrameSnapshotManager *)this;
 	PackedEntityHandle_t origHandle = framesnapshotmanager->m_pPackedData[entity];
 
 	framesnapshotmanager->m_pPackedData[entity] = g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop];
 	bool result = DETOUR_MEMBER_CALL(CFrameSnapshotManager_UsePreviouslySentPacket)(pSnapshot, entity, entSerialNumber);
-	framesnapshotmanager->m_pPackedData[entity] = origHandle;
 
-#if DEBUG
+#ifdef DEBUG
 	char buffer[128];
 	smutils->Format(buffer, sizeof(buffer), "UsePreviouslySentPacket (%d / %d)", origHandle, g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop]);
 	gamehelpers->TextMsg(g_iCurrentClientIndexInLoop+1, 3, buffer);
@@ -156,20 +166,21 @@ DETOUR_DECL_MEMBER3(CFrameSnapshotManager_UsePreviouslySentPacket, bool, CFrameS
 DETOUR_DECL_MEMBER2(CFrameSnapshotManager_GetPreviouslySentPacket, PackedEntity*, int, entity, int, entSerialNumber)
 {
 	if (g_iCurrentClientIndexInLoop == -1
-	 || entity != g_iGameRulesProxyIndex
-	 || g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop] == INVALID_PACKED_ENTITY_HANDLE)
+	 || entity != g_iGameRulesProxyIndex)
 	{
 		return DETOUR_MEMBER_CALL(CFrameSnapshotManager_GetPreviouslySentPacket)(entity, entSerialNumber);
 	}
+
+	if (g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop] == INVALID_PACKED_ENTITY_HANDLE)
+		return false;
 
 	CFrameSnapshotManager *framesnapshotmanager = (CFrameSnapshotManager *)this;
 	PackedEntityHandle_t origHandle = framesnapshotmanager->m_pPackedData[entity];
 
 	framesnapshotmanager->m_pPackedData[entity] = g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop];
 	PackedEntity *result = DETOUR_MEMBER_CALL(CFrameSnapshotManager_GetPreviouslySentPacket)(entity, entSerialNumber);
-	framesnapshotmanager->m_pPackedData[entity] = origHandle;
 
-#if DEBUG
+#ifdef DEBUG
 	char buffer[128];
 	smutils->Format(buffer, sizeof(buffer), "GetPreviouslySentPacket (%d / %d)", origHandle, g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop]);
 	gamehelpers->TextMsg(g_iCurrentClientIndexInLoop+1, 3, buffer);
@@ -187,14 +198,13 @@ DETOUR_DECL_MEMBER2(CFrameSnapshotManager_CreatePackedEntity, PackedEntity*, CFr
 	}
 
 	CFrameSnapshotManager *framesnapshotmanager = (CFrameSnapshotManager *)this;
-	PackedEntityHandle_t origHandle = framesnapshotmanager->m_pPackedData[entity];
 
-	framesnapshotmanager->m_pPackedData[entity] = g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop];
+	if (g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop] != INVALID_PACKED_ENTITY_HANDLE)
+		framesnapshotmanager->m_pPackedData[entity] = g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop];
 	PackedEntity *result = DETOUR_MEMBER_CALL(CFrameSnapshotManager_CreatePackedEntity)(pSnapshot, entity);
-
 	g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop] = framesnapshotmanager->m_pPackedData[entity];
 
-#if DEBUG
+#ifdef DEBUG
 	char buffer[128];
 	smutils->Format(buffer, sizeof(buffer), "CreatePackedEntity (%d / %d)", framesnapshotmanager->m_pPackedData[entity], g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop]);
 	gamehelpers->TextMsg(g_iCurrentClientIndexInLoop+1, 3, buffer);
@@ -211,7 +221,7 @@ DETOUR_DECL_MEMBER1(CFrameSnapshotManager_RemoveEntityReference, void, PackedEnt
 		{
 			g_PlayersPackedGameRules[i] = INVALID_PACKED_ENTITY_HANDLE;
 
-		#if DEBUG
+		#ifdef DEBUG
 			IGamePlayer *plr = playerhelpers->GetGamePlayer(i + 1);
 			if (plr && plr->IsInGame())
 				smutils->LogMessage(myself, "RemoveEntityReference: %s", plr->GetName());
@@ -221,6 +231,10 @@ DETOUR_DECL_MEMBER1(CFrameSnapshotManager_RemoveEntityReference, void, PackedEnt
 
 	return DETOUR_MEMBER_CALL(CFrameSnapshotManager_RemoveEntityReference)(handle);
 }
+
+#ifdef _FORCE_DEBUG
+#undef DEBUG
+#endif
 
 DETOUR_DECL_MEMBER1(CGameServer_SendClientMessages, void, bool, bSendSnapshots)
 {

@@ -198,6 +198,7 @@ DETOUR_DECL_MEMBER2(CFrameSnapshotManager_CreatePackedEntity, PackedEntity*, CFr
 	}
 
 	CFrameSnapshotManager *framesnapshotmanager = (CFrameSnapshotManager *)this;
+	PackedEntityHandle_t origHandle = framesnapshotmanager->m_pPackedData[entity];
 
 	if (g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop] != INVALID_PACKED_ENTITY_HANDLE)
 		framesnapshotmanager->m_pPackedData[entity] = g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop];
@@ -206,7 +207,7 @@ DETOUR_DECL_MEMBER2(CFrameSnapshotManager_CreatePackedEntity, PackedEntity*, CFr
 
 #ifdef DEBUG
 	char buffer[128];
-	smutils->Format(buffer, sizeof(buffer), "CreatePackedEntity (%d / %d)", framesnapshotmanager->m_pPackedData[entity], g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop]);
+	smutils->Format(buffer, sizeof(buffer), "CreatePackedEntity (%d / %d / %d)", origHandle, g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop], framesnapshotmanager->m_pPackedData[entity]);
 	gamehelpers->TextMsg(g_iCurrentClientIndexInLoop+1, 3, buffer);
 #endif
 

@@ -218,7 +218,7 @@ DETOUR_DECL_MEMBER1(CFrameSnapshotManager_RemoveEntityReference, void, PackedEnt
 {
 	CFrameSnapshotManager *framesnapshotmanager = (CFrameSnapshotManager *)this;
 
-	PackedEntity *packedEntity = framesnapshotmanager->m_PackedEntities[handle]
+	PackedEntity *packedEntity = framesnapshotmanager->m_PackedEntities[handle];
 	if ( packedEntity->m_ReferenceCount <= 1)
 	{
 		for (int i = 0; i < (sizeof(g_PlayersPackedGameRules) / sizeof(g_PlayersPackedGameRules[0])); ++i)

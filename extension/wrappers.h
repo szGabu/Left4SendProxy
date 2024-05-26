@@ -22,9 +22,8 @@ typedef struct
 class CFrameSnapshotManager
 {
 public:
-	virtual ~CFrameSnapshotManager( void );
+	int pad[3];
 
-public:
 	CUtlLinkedList<CFrameSnapshot*, unsigned short>		m_FrameSnapshots;
 
 	CClassMemoryPool< PackedEntity >					m_PackedEntitiesPool;

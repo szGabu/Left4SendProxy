@@ -739,11 +739,6 @@ void SendProxyManager::OnCoreMapEnd()
 		i--;
 	}
 
-	for (int i = 0; i < sizeof(g_PlayersPackedGameRules) / sizeof(g_PlayersPackedGameRules[0]); ++i)
-	{
-		g_PlayersPackedGameRules[i] = INVALID_PACKED_ENTITY_HANDLE;
-	}
-	
 	g_pGameRulesProxyEdict = nullptr;
 	g_iGameRulesProxyIndex = -1;
 }

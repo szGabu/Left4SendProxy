@@ -29,6 +29,9 @@ public:
 
 	CUtlFixedLinkedList<PackedEntity *>					m_PackedEntities;
 
+	// FIXME: Update CUtlFixedLinkedList in hl2sdk-l4d2
+	int pad2;
+
 	int								m_nPackedEntityCacheCounter;  // increase with every cache access
 	CUtlVector<UnpackedDataCache_t>	m_PackedEntityCache;	// cache for uncompressed packed entities
 

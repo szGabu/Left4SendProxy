@@ -22,6 +22,9 @@ typedef struct
 class CFrameSnapshotManager
 {
 public:
+	virtual ~CFrameSnapshotManager( void );
+
+public:
 	int pad[3];
 
 	CUtlLinkedList<CFrameSnapshot*, unsigned short>		m_FrameSnapshots;

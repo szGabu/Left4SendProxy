@@ -221,15 +221,29 @@ DETOUR_DECL_MEMBER1(CFrameSnapshotManager_RemoveEntityReference, void, PackedEnt
 	PackedEntity *packedEntity = framesnapshotmanager->m_PackedEntities[handle];
 	if ( packedEntity->m_ReferenceCount <= 1)
 	{
+	#ifdef DEBUG
+		if (g_iCurrentClientIndexInLoop != -1)
+			smutils->LogMessage(myself, "RemoveEntityReference: (%d)", handle);
+	#endif
+
 		for (int i = 0; i < (sizeof(g_PlayersPackedGameRules) / sizeof(g_PlayersPackedGameRules[0])); ++i)
 		{
 			if (g_PlayersPackedGameRules[i] == handle)
 			{
 				g_PlayersPackedGameRules[i] = INVALID_PACKED_ENTITY_HANDLE;
 
-			#ifdef DEBUG
-				smutils->LogMessage(myself, "RemoveEntityReference: (%d / %d)", handle, i+1);
-			#endif
+				#ifdef DEBUG
+					char buffer[128];
+					for (int client = 1; client <= playerhelpers->GetMaxClients(); client++)
+					{
+						IGamePlayer *plr = playerhelpers->GetGamePlayer(client);
+						if (plr && plr->IsInGame())
+						{
+							smutils->Format(buffer, sizeof(buffer), "RemoveEntityReference: (%d / %d)", handle, i + 1);
+							gamehelpers->TextMsg(client, 3, buffer);
+						}
+					}
+				#endif
 			}
 		}
 	}

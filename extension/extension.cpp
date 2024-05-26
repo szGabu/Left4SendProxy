@@ -222,7 +222,7 @@ DETOUR_DECL_MEMBER1(CFrameSnapshotManager_RemoveEntityReference, void, PackedEnt
 	if (framesnapshotmanager->m_PackedEntities[handle] == NULL)
 	{
 		#ifdef DEBUG
-			smutils->LogMessage(myself, "== RemoveEntityReference ==", handle, i+1);
+			smutils->LogMessage(myself, "== RemoveEntityReference ==");
 		#endif
 		for (int i = 0; i < (sizeof(g_PlayersPackedGameRules) / sizeof(g_PlayersPackedGameRules[0])); ++i)
 		{

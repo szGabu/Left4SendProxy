@@ -500,6 +500,10 @@ void Hook_ClientDisconnect(edict_t * pEnt)
 		if (g_ChangeHooks[i].objectID == gamehelpers->IndexOfEdict(pEnt))
 			g_ChangeHooks.Remove(i--);
 	}
+
+	if (gamehelpers->IndexOfEdict(pEnt) != -1)
+		g_PlayersPackedGameRules[gamehelpers->IndexOfEdict(pEnt)] = INVALID_PACKED_ENTITY_HANDLE;
+
 	RETURN_META(MRES_IGNORED);
 }
 
@@ -747,6 +751,11 @@ void SendProxyManager::OnCoreMapEnd()
 
 void SendProxyManager::OnCoreMapStart(edict_t * pEdictList, int edictCount, int clientMax)
 {
+	for (int i = 0; i < (sizeof(g_PlayersPackedGameRules) / sizeof(g_PlayersPackedGameRules[0])); ++i)
+	{
+		g_PlayersPackedGameRules[i] = INVALID_PACKED_ENTITY_HANDLE;
+	}
+	
 	CBaseEntity * pGameRulesProxyEnt = FindEntityByServerClassname(0, g_szGameRulesProxy);
 	if (!pGameRulesProxyEnt)
 	{

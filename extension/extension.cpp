@@ -216,14 +216,11 @@ DETOUR_DECL_MEMBER2(CFrameSnapshotManager_CreatePackedEntity, PackedEntity*, CFr
 
 DETOUR_DECL_MEMBER1(CFrameSnapshotManager_RemoveEntityReference, void, PackedEntityHandle_t, handle)
 {
-	DETOUR_MEMBER_CALL(CFrameSnapshotManager_RemoveEntityReference)(handle);
-
 	CFrameSnapshotManager *framesnapshotmanager = (CFrameSnapshotManager *)this;
-	if (framesnapshotmanager->m_PackedEntities[handle] == NULL)
+
+	PackedEntity *packedEntity = framesnapshotmanager->m_PackedEntities[handle]
+	if ( packedEntity->m_ReferenceCount <= 1)
 	{
-		#ifdef DEBUG
-			smutils->LogMessage(myself, "== RemoveEntityReference ==");
-		#endif
 		for (int i = 0; i < (sizeof(g_PlayersPackedGameRules) / sizeof(g_PlayersPackedGameRules[0])); ++i)
 		{
 			if (g_PlayersPackedGameRules[i] == handle)
@@ -236,6 +233,8 @@ DETOUR_DECL_MEMBER1(CFrameSnapshotManager_RemoveEntityReference, void, PackedEnt
 			}
 		}
 	}
+
+	DETOUR_MEMBER_CALL(CFrameSnapshotManager_RemoveEntityReference)(handle);
 }
 
 #ifdef _FORCE_DEBUG

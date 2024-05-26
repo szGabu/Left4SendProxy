@@ -7,7 +7,19 @@
 #include "tier1/mempool.h"
 
 class CFrameSnapshot;
-class PackedEntity;
+class ServerClass;
+class ClientClass;
+
+class PackedEntity
+{
+public:
+	ServerClass *m_pServerClass;	// Valid on the server
+	ClientClass	*m_pClientClass;	// Valid on the client
+		
+	int			m_nEntityIndex;		// Entity index.
+	CInterlockedInt 	m_ReferenceCount;	// reference count;
+};
+
 #define INVALID_PACKED_ENTITY_HANDLE (0)
 typedef int PackedEntityHandle_t;
 

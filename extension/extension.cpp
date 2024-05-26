@@ -155,9 +155,9 @@ DETOUR_DECL_MEMBER3(CFrameSnapshotManager_UsePreviouslySentPacket, bool, CFrameS
 	bool result = DETOUR_MEMBER_CALL(CFrameSnapshotManager_UsePreviouslySentPacket)(pSnapshot, entity, entSerialNumber);
 
 #ifdef DEBUG
-	char buffer[128];
-	smutils->Format(buffer, sizeof(buffer), "UsePreviouslySentPacket (%d / %d)", origHandle, g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop]);
-	gamehelpers->TextMsg(g_iCurrentClientIndexInLoop+1, 3, buffer);
+	// char buffer[128];
+	// smutils->Format(buffer, sizeof(buffer), "UsePreviouslySentPacket (%d / %d)", origHandle, g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop]);
+	// gamehelpers->TextMsg(g_iCurrentClientIndexInLoop+1, 3, buffer);
 #endif
 
 	return result;

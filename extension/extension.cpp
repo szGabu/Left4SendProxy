@@ -207,7 +207,7 @@ DETOUR_DECL_MEMBER2(CFrameSnapshotManager_CreatePackedEntity, PackedEntity*, CFr
 
 #ifdef DEBUG
 	char buffer[128];
-	smutils->Format(buffer, sizeof(buffer), "CreatePackedEntity (%d / %d / %d)", origHandle, g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop], framesnapshotmanager->m_pLastPackedData[entity]);
+	smutils->Format(buffer, sizeof(buffer), "CreatePackedEntity (%d / %d / %d) count = %d", origHandle, g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop], framesnapshotmanager->m_pLastPackedData[entity], framesnapshotmanager->m_PackedEntitiesPool.Count());
 	gamehelpers->TextMsg(g_iCurrentClientIndexInLoop+1, 3, buffer);
 #endif
 
@@ -221,6 +221,9 @@ DETOUR_DECL_MEMBER1(CFrameSnapshotManager_RemoveEntityReference, void, PackedEnt
 	CFrameSnapshotManager *framesnapshotmanager = (CFrameSnapshotManager *)this;
 	if (framesnapshotmanager->m_PackedEntities[handle] == NULL)
 	{
+		#ifdef DEBUG
+			smutils->LogMessage(myself, "== RemoveEntityReference ==", handle, i+1);
+		#endif
 		for (int i = 0; i < (sizeof(g_PlayersPackedGameRules) / sizeof(g_PlayersPackedGameRules[0])); ++i)
 		{
 			if (g_PlayersPackedGameRules[i] == handle)

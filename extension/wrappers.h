@@ -25,11 +25,8 @@ public:
 	virtual ~CFrameSnapshotManager( void );
 
 public:
-	int pad[3];
+	int pad[21];
 
-	CUtlLinkedList<CFrameSnapshot*, unsigned short>		m_FrameSnapshots;
-
-	CClassMemoryPool< PackedEntity >					m_PackedEntitiesPool;
 	CUtlFixedLinkedList<PackedEntity *>					m_PackedEntities;
 
 	int								m_nPackedEntityCacheCounter;  // increase with every cache access

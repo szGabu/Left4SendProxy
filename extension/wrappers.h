@@ -25,7 +25,6 @@ public:
 	virtual ~CFrameSnapshotManager( void );
 
 public:
-	CThreadFastMutex									m_FrameSnapshotsWriteMutex;
 	CUtlLinkedList<CFrameSnapshot*, unsigned short>		m_FrameSnapshots;
 
 	CClassMemoryPool< PackedEntity >					m_PackedEntitiesPool;

@@ -139,8 +139,7 @@ const char * g_szGameRulesProxy;
 
 DETOUR_DECL_MEMBER3(CFrameSnapshotManager_UsePreviouslySentPacket, bool, CFrameSnapshot*, pSnapshot, int, entity, int, entSerialNumber)
 {
-	if (!g_bSendSnapshots
-	 || g_iCurrentClientIndexInLoop == -1
+	if (g_iCurrentClientIndexInLoop == -1
 	 || entity != g_iGameRulesProxyIndex)
 	{
 		return DETOUR_MEMBER_CALL(CFrameSnapshotManager_UsePreviouslySentPacket)(pSnapshot, entity, entSerialNumber);
@@ -156,8 +155,7 @@ DETOUR_DECL_MEMBER3(CFrameSnapshotManager_UsePreviouslySentPacket, bool, CFrameS
 
 DETOUR_DECL_MEMBER2(CFrameSnapshotManager_GetPreviouslySentPacket, PackedEntity*, int, entity, int, entSerialNumber)
 {
-	if (!g_bSendSnapshots
-	 || g_iCurrentClientIndexInLoop == -1
+	if (g_iCurrentClientIndexInLoop == -1
 	 || entity != g_iGameRulesProxyIndex)
 	{
 		return DETOUR_MEMBER_CALL(CFrameSnapshotManager_GetPreviouslySentPacket)(entity, entSerialNumber);
@@ -171,16 +169,13 @@ DETOUR_DECL_MEMBER2(CFrameSnapshotManager_GetPreviouslySentPacket, PackedEntity*
 	gamehelpers->TextMsg(g_iCurrentClientIndexInLoop+1, 3, buffer);
 #endif
 
-	if (g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop] != INVALID_PACKED_ENTITY_HANDLE)
-		framesnapshotmanager->m_pLastPackedData[entity] = g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop];
-
+	framesnapshotmanager->m_pLastPackedData[entity] = g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop];
 	return DETOUR_MEMBER_CALL(CFrameSnapshotManager_GetPreviouslySentPacket)(entity, entSerialNumber);
 }
 
 DETOUR_DECL_MEMBER2(CFrameSnapshotManager_CreatePackedEntity, PackedEntity*, CFrameSnapshot*, pSnapshot, int, entity)
 {
-	if (!g_bSendSnapshots
-	 || g_iCurrentClientIndexInLoop == -1
+	if (g_iCurrentClientIndexInLoop == -1
 	 || entity != g_iGameRulesProxyIndex)
 	{
 		return DETOUR_MEMBER_CALL(CFrameSnapshotManager_CreatePackedEntity)(pSnapshot, entity);

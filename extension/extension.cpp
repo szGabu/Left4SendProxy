@@ -129,7 +129,7 @@ const char * g_szGameRulesProxy;
 */
 
 #ifndef DEBUG
-#define _FORCE_DEBUG
+// #define _FORCE_DEBUG
 
 #ifdef _FORCE_DEBUG
 #define DEBUG

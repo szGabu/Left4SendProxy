@@ -139,7 +139,8 @@ const char * g_szGameRulesProxy;
 
 DETOUR_DECL_MEMBER3(CFrameSnapshotManager_UsePreviouslySentPacket, bool, CFrameSnapshot*, pSnapshot, int, entity, int, entSerialNumber)
 {
-	if (g_iCurrentClientIndexInLoop == -1
+	if (g_HooksGamerules.Count() == 0
+	 || g_iCurrentClientIndexInLoop == -1
 	 || entity != g_iGameRulesProxyIndex)
 	{
 		return DETOUR_MEMBER_CALL(CFrameSnapshotManager_UsePreviouslySentPacket)(pSnapshot, entity, entSerialNumber);
@@ -155,7 +156,8 @@ DETOUR_DECL_MEMBER3(CFrameSnapshotManager_UsePreviouslySentPacket, bool, CFrameS
 
 DETOUR_DECL_MEMBER2(CFrameSnapshotManager_GetPreviouslySentPacket, PackedEntity*, int, entity, int, entSerialNumber)
 {
-	if (g_iCurrentClientIndexInLoop == -1
+	if (g_HooksGamerules.Count() == 0
+	 || g_iCurrentClientIndexInLoop == -1
 	 || entity != g_iGameRulesProxyIndex)
 	{
 		return DETOUR_MEMBER_CALL(CFrameSnapshotManager_GetPreviouslySentPacket)(entity, entSerialNumber);
@@ -175,7 +177,8 @@ DETOUR_DECL_MEMBER2(CFrameSnapshotManager_GetPreviouslySentPacket, PackedEntity*
 
 DETOUR_DECL_MEMBER2(CFrameSnapshotManager_CreatePackedEntity, PackedEntity*, CFrameSnapshot*, pSnapshot, int, entity)
 {
-	if (g_iCurrentClientIndexInLoop == -1
+	if (g_HooksGamerules.Count() == 0
+	 || g_iCurrentClientIndexInLoop == -1
 	 || entity != g_iGameRulesProxyIndex)
 	{
 		return DETOUR_MEMBER_CALL(CFrameSnapshotManager_CreatePackedEntity)(pSnapshot, entity);

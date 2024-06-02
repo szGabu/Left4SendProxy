@@ -6,9 +6,40 @@
 #include "tier1/utllinkedlist.h"
 #include "tier1/mempool.h"
 
-class CFrameSnapshot;
 class ServerClass;
 class ClientClass;
+class CFrameSnapshotEntry;
+class CHLTVEntityData;
+class CEventInfo;
+
+class CFrameSnapshot
+{
+public:
+	// Index info CFrameSnapshotManager::m_FrameSnapshots.
+	CInterlockedInt			m_ListIndex;	
+
+	// Associated frame. 
+	int						m_nTickCount; // = sv.tickcount
+	
+	// State information
+	CFrameSnapshotEntry		*m_pEntities;	
+	int						m_nNumEntities; // = sv.num_edicts
+
+	// This list holds the entities that are in use and that also aren't entities for inactive clients.
+	unsigned short			*m_pValidEntities; 
+	int						m_nValidEntities;
+
+	// Additional HLTV info
+	CHLTVEntityData			*m_pHLTVEntityData; // is NULL if not in HLTV mode or array of m_pValidEntities entries
+
+	CEventInfo				**m_pTempEntities; // temp entities
+	int						m_nTempEntities;
+
+	CUtlVector<int>			m_iExplicitDeleteSlots;
+
+	// Snapshots auto-delete themselves when their refcount goes to zero.
+	CInterlockedInt			m_nReferences;
+};
 
 class PackedEntity
 {

@@ -102,10 +102,12 @@ ConVar * sv_parallel_sendsnapshot = nullptr;
 
 edict_t * g_pGameRulesProxyEdict = nullptr;
 int g_iGameRulesProxyIndex = -1;
-PackedEntityHandle_t g_PlayersPackedGameRules[65] = {INVALID_PACKED_ENTITY_HANDLE};
+PackedEntityHandle_t g_PlayersPackedGameRules[SM_MAXPLAYERS] = {INVALID_PACKED_ENTITY_HANDLE};
 void * g_pGameRules = nullptr;
 bool g_bShouldChangeGameRulesState = false;
 bool g_bSendSnapshots = false;
+
+bool g_bEdictChanged[MAX_EDICTS] = {false};
 
 CGlobalVars * g_pGlobals = nullptr;
 
@@ -139,8 +141,7 @@ const char * g_szGameRulesProxy;
 
 DETOUR_DECL_MEMBER3(CFrameSnapshotManager_UsePreviouslySentPacket, bool, CFrameSnapshot*, pSnapshot, int, entity, int, entSerialNumber)
 {
-	if (g_HooksGamerules.Count() == 0
-	 || g_iCurrentClientIndexInLoop == -1
+	if (g_iCurrentClientIndexInLoop == -1
 	 || entity != g_iGameRulesProxyIndex)
 	{
 		return DETOUR_MEMBER_CALL(CFrameSnapshotManager_UsePreviouslySentPacket)(pSnapshot, entity, entSerialNumber);
@@ -156,8 +157,7 @@ DETOUR_DECL_MEMBER3(CFrameSnapshotManager_UsePreviouslySentPacket, bool, CFrameS
 
 DETOUR_DECL_MEMBER2(CFrameSnapshotManager_GetPreviouslySentPacket, PackedEntity*, int, entity, int, entSerialNumber)
 {
-	if (g_HooksGamerules.Count() == 0
-	 || g_iCurrentClientIndexInLoop == -1
+	if (g_iCurrentClientIndexInLoop == -1
 	 || entity != g_iGameRulesProxyIndex)
 	{
 		return DETOUR_MEMBER_CALL(CFrameSnapshotManager_GetPreviouslySentPacket)(entity, entSerialNumber);
@@ -177,8 +177,7 @@ DETOUR_DECL_MEMBER2(CFrameSnapshotManager_GetPreviouslySentPacket, PackedEntity*
 
 DETOUR_DECL_MEMBER2(CFrameSnapshotManager_CreatePackedEntity, PackedEntity*, CFrameSnapshot*, pSnapshot, int, entity)
 {
-	if (g_HooksGamerules.Count() == 0
-	 || g_iCurrentClientIndexInLoop == -1
+	if (g_iCurrentClientIndexInLoop == -1
 	 || entity != g_iGameRulesProxyIndex)
 	{
 		return DETOUR_MEMBER_CALL(CFrameSnapshotManager_CreatePackedEntity)(pSnapshot, entity);
@@ -259,6 +258,24 @@ DETOUR_DECL_MEMBER1(CGameServer_SendClientMessages, void, bool, bSendSnapshots)
 		SH_ADD_HOOK(IServer, GetClientCount, g_pIServer, SH_MEMBER(&g_SendProxyManager, &SendProxyManager::GetClientCount), false);
 		g_bFirstTimeCalled = false;
 	}
+
+	for (int i = 0; i < MAX_EDICTS; ++i)
+	{
+		g_bEdictChanged[i] = false;
+
+		edict_t *edict = gamehelpers->EdictOfIndex(i);
+		if (!edict || !edict->GetUnknown() || edict->IsFree())
+			continue;
+
+		if (i > 0 && i <= playerhelpers->GetMaxClients())
+		{
+			if (!g_pIServer->GetClient(i-1)->IsActive())
+				continue;
+		}
+
+		g_bEdictChanged[i] = true;
+	}
+
 	bool bCalledForNullIClientsThisTime = false;
 	for (int iClients = 1; iClients <= playerhelpers->GetMaxClients(); iClients++)
 	{
@@ -427,6 +444,15 @@ DETOUR_DECL_STATIC3(SV_ComputeClientPacks, void, int, iClientCount, CGameClient 
 	for (int i = 0; i < g_vHookedEdicts.Count(); i++)
 	{
 		edict_t * pEdict = g_vHookedEdicts[i];
+		if (pEdict && !(pEdict->m_fStateFlags & FL_EDICT_CHANGED))
+			pEdict->m_fStateFlags |= FL_EDICT_CHANGED;
+	}
+	for (int i = 0; i < MAX_EDICTS; ++i)
+	{
+		if (!g_bEdictChanged[i])
+			continue;
+
+		edict_t *pEdict = gamehelpers->IndexOfEdict(i);
 		if (pEdict && !(pEdict->m_fStateFlags & FL_EDICT_CHANGED))
 			pEdict->m_fStateFlags |= FL_EDICT_CHANGED;
 	}
@@ -751,8 +777,8 @@ void SendProxyManager::OnCoreMapStart(edict_t * pEdictList, int edictCount, int 
 	{
 		g_PlayersPackedGameRules[i] = INVALID_PACKED_ENTITY_HANDLE;
 	}
-	
-	CBaseEntity * pGameRulesProxyEnt = FindEntityByServerClassname(0, g_szGameRulesProxy);
+
+	CBaseEntity *pGameRulesProxyEnt = FindEntityByServerClassname(0, g_szGameRulesProxy);
 	if (!pGameRulesProxyEnt)
 	{
 		smutils->LogError(myself, "Unable to get gamerules proxy ent (1)!");

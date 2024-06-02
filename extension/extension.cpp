@@ -452,7 +452,7 @@ DETOUR_DECL_STATIC3(SV_ComputeClientPacks, void, int, iClientCount, CGameClient 
 		if (!g_bEdictChanged[i])
 			continue;
 
-		edict_t *pEdict = gamehelpers->IndexOfEdict(i);
+		edict_t *pEdict = gamehelpers->EdictOfIndex(i);
 		if (pEdict && !(pEdict->m_fStateFlags & FL_EDICT_CHANGED))
 			pEdict->m_fStateFlags |= FL_EDICT_CHANGED;
 	}

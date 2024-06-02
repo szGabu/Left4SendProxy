@@ -51,8 +51,8 @@ jobs:
       - name: Prepare L4D SDK
         run: |
           cd alliedmodders
-          git clone --mirror https://github.com/jensewe/hl2sdk hl2sdk-proxy-repo
-          git clone hl2sdk-proxy-repo hl2sdk-l4d2 -b l4d2-may14
+          git clone --mirror https://github.com/alliedmodders/hl2sdk hl2sdk-proxy-repo
+          git clone hl2sdk-proxy-repo hl2sdk-l4d2 -b l4d2
           git clone hl2sdk-proxy-repo hl2sdk-l4d -b l4d
           
       - name: Prepare Metamod Source

@@ -273,6 +273,9 @@ DETOUR_DECL_MEMBER1(CGameServer_SendClientMessages, void, bool, bSendSnapshots)
 				continue;
 		}
 
+		if (!edict->HasStateChanged())
+			continue;
+
 		g_bEdictChanged[i] = true;
 	}
 

@@ -1219,7 +1219,7 @@ void CallChangeGamerulesCallbacks(PropChangeHookGamerules * pInfo, void * pOldVa
 
 //Proxy
 
-bool CallInt(SendPropHook hook, int *ret, int iElement)
+bool CallInt(SendPropHook &hook, int *ret, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
@@ -1265,7 +1265,7 @@ bool CallInt(SendPropHook hook, int *ret, int iElement)
 	return false;
 }
 
-bool CallIntGamerules(SendPropHookGamerules hook, int *ret, int iElement)
+bool CallIntGamerules(SendPropHookGamerules &hook, int *ret, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
@@ -1310,7 +1310,7 @@ bool CallIntGamerules(SendPropHookGamerules hook, int *ret, int iElement)
 	return false;
 }
 
-bool CallFloat(SendPropHook hook, float *ret, int iElement)
+bool CallFloat(SendPropHook &hook, float *ret, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
@@ -1356,7 +1356,7 @@ bool CallFloat(SendPropHook hook, float *ret, int iElement)
 	return false;
 }
 
-bool CallFloatGamerules(SendPropHookGamerules hook, float *ret, int iElement)
+bool CallFloatGamerules(SendPropHookGamerules &hook, float *ret, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
@@ -1401,7 +1401,7 @@ bool CallFloatGamerules(SendPropHookGamerules hook, float *ret, int iElement)
 	return false;
 }
 
-bool CallString(SendPropHook hook, char **ret, int iElement)
+bool CallString(SendPropHook &hook, char **ret, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
@@ -1448,7 +1448,7 @@ bool CallString(SendPropHook hook, char **ret, int iElement)
 	return false;
 }
 
-bool CallStringGamerules(SendPropHookGamerules hook, char **ret, int iElement)
+bool CallStringGamerules(SendPropHookGamerules &hook, char **ret, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
@@ -1503,7 +1503,7 @@ bool CallStringGamerules(SendPropHookGamerules hook, char **ret, int iElement)
 	return false;
 }
 
-bool CallVector(SendPropHook hook, Vector &vec, int iElement)
+bool CallVector(SendPropHook &hook, Vector &vec, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
@@ -1558,7 +1558,7 @@ bool CallVector(SendPropHook hook, Vector &vec, int iElement)
 	return false;
 }
 
-bool CallVectorGamerules(SendPropHookGamerules hook, Vector &vec, int iElement)
+bool CallVectorGamerules(SendPropHookGamerules &hook, Vector &vec, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;

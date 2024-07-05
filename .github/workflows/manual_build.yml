@@ -9,12 +9,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-20.04, ubuntu-latest]
-        include:
-          - os: ubuntu-latest
-            os_short: linux
-          - os: ubuntu-20.04
-            os_short: oldlinux
+        os: [ubuntu-20.04, ubuntu-22.04, ubuntu-latest]
 
     name: Build Project ${{ matrix.os_short }}
     runs-on: ${{ matrix.os }}
@@ -86,7 +81,7 @@ jobs:
       - name: Upload Binary (Package)
         uses: actions/upload-artifact@v2
         with:
-          name: sendproxy-${{ matrix.os_short }}
+          name: sendproxy-${{ matrix.os }}
           path: /home/runner/work/Left4SendProxy/Left4SendProxy/addons
 
   release:
@@ -99,7 +94,7 @@ jobs:
           - os: ubuntu-20.04
             os_short: oldlinux
 
-    name: Create Release ${{ matrix.os_short }}
+    name: Create Release ${{ matrix.os }}
     needs: build
     runs-on: ${{ matrix.os }}
     
@@ -107,7 +102,7 @@ jobs:
       - name: Download Artifact
         uses: actions/download-artifact@v2
         with:
-          name: sendproxy-${{ matrix.os_short }}
+          name: sendproxy-${{ matrix.os }}
           path: /tmp/Left4SendProxy
 
       - name: Get latest tag
@@ -116,13 +111,13 @@ jobs:
           echo "TAG=$(curl -s "https://api.github.com/repos/${{ github.repository }}/tags" | jq -r ".[0].name")" >> $GITHUB_ENV
 
       - name: Zip sourcemod directory
-        run: (cd /tmp/Left4SendProxy/sourcemod/ && zip -r /tmp/${{ matrix.os_short }}_release.zip .)
+        run: (cd /tmp/Left4SendProxy/sourcemod/ && zip -r /tmp/${{ matrix.os }}_release.zip .)
 
         
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.TAG }}
-          files: /tmp/${{ matrix.os_short }}_release.zip
+          files: /tmp/${{ matrix.os }}_release.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

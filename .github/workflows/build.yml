@@ -62,9 +62,9 @@ jobs:
         shell: bash
         run: |
           mkdir alliedmodders
-        working-directory: alliedmodders
 
       - name: Prepare Sourcemod
+        working-directory: alliedmodders
         run: |
           git clone --recursive https://github.com/alliedmodders/sourcemod -b 1.11-dev
 

@@ -93,7 +93,7 @@ jobs:
           cd extension
           mkdir build
           cd build
-          python3 ../configure.py --enable-optimize --hl2sdk-root=../../alliedmodders --sm-path=../../alliedmodders/sourcemod --mms-path=../../alliedmodders/mmsource-1.10 --sdks l4d,l4d2
+          python3 ../configure.py --enable-optimize --hl2sdk-root=../../../alliedmodders --sm-path=../../../alliedmodders/sourcemod --mms-path=../../../alliedmodders/mmsource-1.10 --sdks l4d,l4d2
 
       - name: Run AMBuild
         run: |

@@ -26,6 +26,8 @@ jobs:
 
     name: Build Project ${{ matrix.os_short }}
     runs-on: ${{ matrix.os }}
+    env:
+      SDKS: '["l4d","l4d2"]'
 
     steps:
       - name: Setup Environment
@@ -86,19 +88,19 @@ jobs:
           git clone https://github.com/alliedmodders/ambuild
           pip install ./ambuild
 
-      - name: Configure AMBuild
+      - name: Run AMBuild
         working-directory: src
         shell: bash
         run: |
           cd extension
           mkdir build
           cd build
-          python3 ../configure.py --enable-optimize --hl2sdk-root=../../../alliedmodders --sm-path=../../../alliedmodders/sourcemod --mms-path=../../../alliedmodders/mmsource-1.10 --sdks l4d,l4d2
-
-      - name: Run AMBuild
-        run: |
-          cd extension
-          cd build
+          python ../configure.py \
+            --enable-optimize \
+            --hl2sdk-root=${{ github.workspace }}/alliedmodders \
+            --sm-path=${{ github.workspace }}/alliedmodders/sourcemod \
+            --mms-path=${{ github.workspace }}/alliedmodders/mmsource-1.10 \
+            --sdks ${{ join(fromJSON(env.SDKS)) }}
           ambuild
 
       - name: Copy to addons directory

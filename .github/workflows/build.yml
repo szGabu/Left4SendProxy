@@ -1,0 +1,107 @@
+name: Build
+on:
+  push:
+    branches:
+     - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, ubuntu-latest, windows-latest]
+        include:
+          - os: windows-latest
+            os_short: win
+            compiler_cc: msvc
+          - os: ubuntu-latest
+            os_short: linux
+            compiler_cc: clang
+            compiler_cxx: clang++
+          - os: ubuntu-20.04
+            os_short: oldlinux
+            compiler_cc: clang-8
+            compiler_cxx: clang++-8
+      fail-fast: false
+
+    name: Build Project ${{ matrix.os_short }}
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Setup Environment
+        shell: bash
+        run: |
+          echo "GITHUB_SHA_SHORT=${GITHUB_SHA::7}" >> $GITHUB_ENV
+          
+      - name: Install Dependencies
+        if: startsWith(runner.os, 'Linux')
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y clang g++-multilib
+
+      - uses: actions/setup-python@v5
+        name: Setup Python 3.8
+        with:
+          python-version: 3.8
+
+      - name: Select clang compiler
+        if: startsWith(runner.os, 'Linux')
+        run: |
+          echo "CC=${{ matrix.compiler_cc }}" >> $GITHUB_ENV
+          echo "CXX=${{ matrix.compiler_cxx }}" >> $GITHUB_ENV
+          ${{ matrix.compiler_cc }} --version
+          ${{ matrix.compiler_cxx }} --version
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          path: src
+  
+      - name: Prepare Alliedmodders Directory
+        run: |
+          mkdir alliedmodders
+        working-directory: alliedmodders
+
+      - name: Prepare Sourcemod
+        run: |
+          git clone --recursive https://github.com/alliedmodders/sourcemod -b 1.11-dev
+
+      - name: Prepare L4D SDK
+        run: |
+          git clone --mirror https://github.com/alliedmodders/hl2sdk hl2sdk-proxy-repo
+          git clone hl2sdk-proxy-repo hl2sdk-l4d2 -b l4d2
+          git clone hl2sdk-proxy-repo hl2sdk-l4d -b l4d
+          
+      - name: Prepare Metamod Source
+        run: |
+          git clone https://github.com/alliedmodders/metamod-source mmsource-1.10 -b 1.10-dev
+
+      - name: Install AMBuild
+        run: |
+          git clone https://github.com/alliedmodders/ambuild
+          pip install ./ambuild
+
+      - name: Configure AMBuild
+        working-directory: src
+        run: |
+          cd extension
+          mkdir build
+          cd build
+          python3 ../configure.py --enable-optimize --hl2sdk-root=../../alliedmodders --sm-path=../../alliedmodders/sourcemod --mms-path=../../alliedmodders/mmsource-1.10 --sdks l4d,l4d2
+
+      - name: Run AMBuild
+        run: |
+          cd extension
+          cd build
+          ambuild
+
+      - name: Copy to addons directory
+        run: |
+          cp -r src/extension/build/package/addons/sourcemod/extensions /home/runner/work/Left4SendProxy/Left4SendProxy/addons/sourcemod
+
+      - name: Upload Binary (Package)
+        uses: actions/upload-artifact@v2
+        with:
+          name: sendproxy-${{ matrix.os_short }}
+          path: src/addons

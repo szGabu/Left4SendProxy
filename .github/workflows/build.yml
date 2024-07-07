@@ -38,7 +38,7 @@ jobs:
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update
-          sudo apt-get install -y clang g++-multilib
+          sudo apt-get install -y g++-multilib ${{ matrix.compiler_cc }}
 
       - uses: actions/setup-python@v5
         name: Setup Python 3.8
@@ -59,6 +59,7 @@ jobs:
           path: src
   
       - name: Prepare Alliedmodders Directory
+        shell: bash
         run: |
           mkdir alliedmodders
         working-directory: alliedmodders
@@ -84,6 +85,7 @@ jobs:
 
       - name: Configure AMBuild
         working-directory: src
+        shell: bash
         run: |
           cd extension
           mkdir build
@@ -97,6 +99,7 @@ jobs:
           ambuild
 
       - name: Copy to addons directory
+        shell: bash
         run: |
           cp -r src/extension/build/package/addons/sourcemod/extensions /home/runner/work/Left4SendProxy/Left4SendProxy/addons/sourcemod
 

@@ -107,9 +107,10 @@ jobs:
           ambuild
 
       - name: Copy to addons directory
+        working-directory: src
         shell: bash
         run: |
-          cp -r src/extension/build/package/addons/sourcemod/extensions /home/runner/work/Left4SendProxy/Left4SendProxy/addons/sourcemod
+          cp -r extension/build/package/addons/sourcemod/extensions addons/sourcemod
 
       - name: Upload Binary (Package)
         uses: actions/upload-artifact@v2

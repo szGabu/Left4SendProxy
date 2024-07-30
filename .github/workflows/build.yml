@@ -117,7 +117,6 @@ jobs:
           mkdir build
           cd build
           python ../configure.py \
-            --enable-optimize \
             --hl2sdk-root="${{ github.workspace }}/alliedmodders" \
             --sm-path="${{ github.workspace }}/alliedmodders/sourcemod" \
             --mms-path="${{ github.workspace }}/alliedmodders/mmsource-1.10" \

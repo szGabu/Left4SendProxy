@@ -14,36 +14,43 @@
 			{
 				"library"			"engine"
 				"linux"				"@_ZN11CGameClient18ShouldSendMessagesEv"
+				"windows"			"\x55\x8B\xEC\x51\x56\x8B\xF1\x80\xBE\xBC\x00\x00\x00\x00"
 			}
 			"CGameServer::SendClientMessages"
 			{
 				"library"			"engine"
 				"linux"				"@_ZN11CGameServer18SendClientMessagesEb"
+				"windows"			"\x55\x8B\xEC\x81\xEC\xB4\x00\x00\x00\xA1\x2A\x2A\x2A\x2A\x53"
 			}
 			"SV_ComputeClientPacks"
 			{
 				"library"			"engine"
 				"linux"				"@_Z21SV_ComputeClientPacksiPP11CGameClientP14CFrameSnapshot"
+				"windows"			"\x55\x8B\xEC\x83\xEC\x44\xA1\x2A\x2A\x2A\x2A\x53"
 			}
 			"CFrameSnapshotManager::UsePreviouslySentPacket"
 			{
 				"library"			"engine"
 				"linux"				"@_ZN21CFrameSnapshotManager23UsePreviouslySentPacketEP14CFrameSnapshotii"
+				"windows"			"\x55\x8B\xEC\x56\x8B\x75\x0C\x57\x8B\xBC\xB1\x9C\x00\x00\x00"
 			}
 			"CFrameSnapshotManager::GetPreviouslySentPacket"
 			{
 				"library"			"engine"
 				"linux"				"@_ZN21CFrameSnapshotManager23GetPreviouslySentPacketEii"
+				"windows"			"\x55\x8B\xEC\x8B\x55\x08\x8B\x84\x91\x9C\x00\x00\x00"
 			}
 			"CFrameSnapshotManager::CreatePackedEntity"
 			{
 				"library"			"engine"
 				"linux"				"@_ZN21CFrameSnapshotManager18CreatePackedEntityEP14CFrameSnapshoti"
+				"windows"			"\x55\x8B\xEC\x83\xEC\x0C\x53\x8B\xD9\x56"
 			}
 			"CFrameSnapshotManager::RemoveEntityReference"
 			{
 				"library"			"engine"
 				"linux"				"@_ZN21CFrameSnapshotManager21RemoveEntityReferenceEi"
+				"windows"			"\x55\x8B\xEC\x51\x8B\x45\x08\x53\x8B\x18"
 			}
 		}
 	}

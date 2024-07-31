@@ -450,7 +450,7 @@ DETOUR_DECL_STATIC3(SV_ComputeClientPacks, void, int, iClientCount, CGameClient 
 	for (int i = 0; i < g_vHookedEdicts.Count(); i++)
 	{
 		edict_t * pEdict = g_vHookedEdicts[i];
-		if (pEdict && !(pEdict->m_fStateFlags & FL_EDICT_CHANGED))
+		if (pEdict && !pEdict->IsFree() && pEdict->GetUnknown() && !(pEdict->m_fStateFlags & FL_EDICT_CHANGED))
 			pEdict->m_fStateFlags |= FL_EDICT_CHANGED;
 	}
 	for (int i = 0; i < MAX_EDICTS; ++i)

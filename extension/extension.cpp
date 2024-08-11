@@ -48,6 +48,7 @@
 #include "extension.h"
 #include "interfaceimpl.h"
 #include "natives.h"
+#include "wrappers.h"
 
 //path: hl2sdk-<your sdk here>/public/<include>.h, "../public/" included to prevent compile errors due wrong directory scanning by compiler on my computer, and I'm too lazy to find where I can change that =D
 #include <../public/iserver.h>
@@ -55,14 +56,10 @@
 
 SH_DECL_HOOK1_void(IServerGameClients, ClientDisconnect, SH_NOATTRIB, false, edict_t *);
 SH_DECL_HOOK1_void(IServerGameDLL, GameFrame, SH_NOATTRIB, false, bool);
-SH_DECL_HOOK0(IServer, GetClientCount, const, false, int);
 
-DECL_DETOUR(CGameServer_SendClientMessages);
-DECL_DETOUR(CGameClient_ShouldSendMessages);
 DECL_DETOUR(CFrameSnapshotManager_UsePreviouslySentPacket);
 DECL_DETOUR(CFrameSnapshotManager_GetPreviouslySentPacket);
 DECL_DETOUR(CFrameSnapshotManager_CreatePackedEntity);
-// DECL_DETOUR(CFrameSnapshotManager_RemoveEntityReference);
 DECL_DETOUR(SV_ComputeClientPacks);
 
 class CGameClient;
@@ -71,11 +68,7 @@ class CGlobalEntityList;
 
 CGameClient * g_pCurrentGameClientPtr = nullptr;
 int g_iCurrentClientIndexInLoop = -1; //used for optimization
-bool g_bCurrentGameClientCallFwd = false;
 bool g_bCallingForNullClients = false;
-bool g_bFirstTimeCalled = true;
-bool g_bSVComputePacksDone = false;
-IServer * g_pIServer = nullptr;
 
 SendProxyManager g_SendProxyManager;
 SendProxyManagerInterfaceImpl * g_pMyInterface = nullptr;
@@ -88,10 +81,9 @@ CUtlVector<SendPropHookGamerules> g_HooksGamerules;
 CUtlVector<PropChangeHook> g_ChangeHooks;
 CUtlVector<PropChangeHookGamerules> g_ChangeHooksGamerules;
 
-CUtlVector<edict_t *> g_vHookedEdicts;
-
 IServerGameEnts * gameents = nullptr;
 IServerGameClients * gameclients = nullptr;
+IBinTools* bintools = NULL;
 ISDKTools * g_pSDKTools = nullptr;
 ISDKHooks * g_pSDKHooks = nullptr;
 IGameConfig * g_pGameConf = nullptr;
@@ -104,18 +96,20 @@ edict_t * g_pGameRulesProxyEdict = nullptr;
 int g_iGameRulesProxyIndex = -1;
 PackedEntityHandle_t g_PlayersPackedGameRules[SM_MAXPLAYERS] = {INVALID_PACKED_ENTITY_HANDLE};
 void * g_pGameRules = nullptr;
-bool g_bShouldChangeGameRulesState = false;
 bool g_bSendSnapshots = false;
 
 bool g_bEdictChanged[MAX_EDICTS] = {false};
-
-CGlobalVars * g_pGlobals = nullptr;
 
 static CBaseEntity * FindEntityByServerClassname(int, const char *);
 static void CallChangeCallbacks(PropChangeHook * pInfo, void * pOldValue, void * pNewValue);
 static void CallChangeGamerulesCallbacks(PropChangeHookGamerules * pInfo, void * pOldValue, void * pNewValue);
 
 const char * g_szGameRulesProxy;
+
+CFrameSnapshotManager* framesnapshotmanager = nullptr;
+void* CFrameSnapshotManager::s_pfnTakeTickSnapshot = nullptr;
+ICallWrapper* CFrameSnapshotManager::s_callTakeTickSnapshot = nullptr;
+int CGameClient::s_iOffs_edict = -1;
 
 //detours
 
@@ -142,7 +136,6 @@ const char * g_szGameRulesProxy;
 DETOUR_DECL_MEMBER3(CFrameSnapshotManager_UsePreviouslySentPacket, bool, CFrameSnapshot*, pSnapshot, int, entity, int, entSerialNumber)
 {
 	if (g_iCurrentClientIndexInLoop == -1
-	 || !g_bCurrentGameClientCallFwd
 	 || entity != g_iGameRulesProxyIndex)
 	{
 		return DETOUR_MEMBER_CALL(CFrameSnapshotManager_UsePreviouslySentPacket)(pSnapshot, entity, entSerialNumber);
@@ -159,7 +152,6 @@ DETOUR_DECL_MEMBER3(CFrameSnapshotManager_UsePreviouslySentPacket, bool, CFrameS
 DETOUR_DECL_MEMBER2(CFrameSnapshotManager_GetPreviouslySentPacket, PackedEntity*, int, entity, int, entSerialNumber)
 {
 	if (g_iCurrentClientIndexInLoop == -1
-	 || !g_bCurrentGameClientCallFwd
 	 || entity != g_iGameRulesProxyIndex)
 	{
 		return DETOUR_MEMBER_CALL(CFrameSnapshotManager_GetPreviouslySentPacket)(entity, entSerialNumber);
@@ -180,7 +172,6 @@ DETOUR_DECL_MEMBER2(CFrameSnapshotManager_GetPreviouslySentPacket, PackedEntity*
 DETOUR_DECL_MEMBER2(CFrameSnapshotManager_CreatePackedEntity, PackedEntity*, CFrameSnapshot*, pSnapshot, int, entity)
 {
 	if (g_iCurrentClientIndexInLoop == -1
-	 || !g_bCurrentGameClientCallFwd
 	 || entity != g_iGameRulesProxyIndex)
 	{
 		return DETOUR_MEMBER_CALL(CFrameSnapshotManager_CreatePackedEntity)(pSnapshot, entity);
@@ -203,225 +194,9 @@ DETOUR_DECL_MEMBER2(CFrameSnapshotManager_CreatePackedEntity, PackedEntity*, CFr
 	return result;
 }
 
-// DETOUR_DECL_MEMBER1(CFrameSnapshotManager_RemoveEntityReference, void, PackedEntityHandle_t, handle)
-// {
-// 	CFrameSnapshotManager *framesnapshotmanager = (CFrameSnapshotManager *)this;
-
-// 	PackedEntity *packedEntity = framesnapshotmanager->m_PackedEntities[handle];
-// 	if ( packedEntity->m_ReferenceCount <= 1)
-// 	{
-// 		for (int i = 0; i < (sizeof(g_PlayersPackedGameRules) / sizeof(g_PlayersPackedGameRules[0])); ++i)
-// 		{
-// 			if (g_PlayersPackedGameRules[i] == handle)
-// 			{
-// 				g_PlayersPackedGameRules[i] = INVALID_PACKED_ENTITY_HANDLE;
-
-// 			#ifdef DEBUG
-// 				char buffer[128];
-// 				for (int client = 1; client <= playerhelpers->GetMaxClients(); client++)
-// 				{
-// 					IGamePlayer *plr = playerhelpers->GetGamePlayer(client);
-// 					if (plr && plr->IsInGame() && !plr->IsFakeClient())
-// 					{
-// 						smutils->Format(buffer, sizeof(buffer), "RemoveEntityReference: (%d / %d)", handle, i + 1);
-// 						gamehelpers->TextMsg(client, 3, buffer);
-// 					}
-// 				}
-// 			#endif
-// 			}
-// 		}
-// 	}
-
-// 	DETOUR_MEMBER_CALL(CFrameSnapshotManager_RemoveEntityReference)(handle);
-// }
-
 #ifdef _FORCE_DEBUG
 #undef DEBUG
 #endif
-
-DETOUR_DECL_MEMBER1(CGameServer_SendClientMessages, void, bool, bSendSnapshots)
-{
-	if (!bSendSnapshots)
-	{
-		g_bSendSnapshots = false;
-		return DETOUR_MEMBER_CALL(CGameServer_SendClientMessages)(false); //if so, we do not interested in this call
-	}
-	else
-		g_bSendSnapshots = true;
-	if (!g_pIServer && g_pSDKTools)
-		g_pIServer = g_pSDKTools->GetIServer();
-	if (!g_pIServer)
-		return DETOUR_MEMBER_CALL(CGameServer_SendClientMessages)(true); //if so, we should stop to process this function! See below
-	if (g_bFirstTimeCalled)
-	{
-#ifdef _WIN32
-		//HACK, don't delete this, or server will be crashed on start!
-		g_pIServer->GetClientCount();
-#endif
-		SH_ADD_HOOK(IServer, GetClientCount, g_pIServer, SH_MEMBER(&g_SendProxyManager, &SendProxyManager::GetClientCount), false);
-		g_bFirstTimeCalled = false;
-	}
-
-	for (int i = 0; i < MAX_EDICTS; ++i)
-	{
-		g_bEdictChanged[i] = false;
-
-		edict_t *edict = gamehelpers->EdictOfIndex(i);
-		if (!edict || !edict->GetUnknown() || edict->IsFree())
-			continue;
-
-		if (i > 0 && i <= playerhelpers->GetMaxClients())
-		{
-			if (!g_pIServer->GetClient(i-1)->IsActive())
-				continue;
-		}
-
-		if (!edict->HasStateChanged())
-			continue;
-
-		g_bEdictChanged[i] = true;
-	}
-
-	bool bCalledForNullIClientsThisTime = false;
-	for (int iClients = 1; iClients <= playerhelpers->GetMaxClients(); iClients++)
-	{
-		IGamePlayer * pPlayer = playerhelpers->GetGamePlayer(iClients);
-		bool bFake = (pPlayer->IsFakeClient() && !(pPlayer->IsSourceTV()
-#if SOURCE_ENGINE != SE_CSGO
-		|| pPlayer->IsReplay()
-#endif
-		));
-		volatile IClient * pClient = nullptr; //volatile used to prevent optimizations here for some reason
-		if (!pPlayer->IsConnected() || bFake || (pClient = g_pIServer->GetClient(iClients - 1)) == nullptr)
-		{
-			if (!bCalledForNullIClientsThisTime && !g_bCallingForNullClients)
-			{
-				g_bCurrentGameClientCallFwd = false;
-				g_bCallingForNullClients = true;
-				DETOUR_MEMBER_CALL(CGameServer_SendClientMessages)(true);
-				g_bCallingForNullClients = false;
-			}
-			bCalledForNullIClientsThisTime = true;
-			continue;
-		}
-		if (!pPlayer->IsInGame() || bFake) //We should call SV_ComputeClientPacks, but shouldn't call forwards!
-			g_bCurrentGameClientCallFwd = false;
-		else
-			g_bCurrentGameClientCallFwd = true;
-		g_pCurrentGameClientPtr = (CGameClient *)((char *)pClient - 4);
-		g_iCurrentClientIndexInLoop = iClients - 1;
-		DETOUR_MEMBER_CALL(CGameServer_SendClientMessages)(true);
-	}
-	g_bCurrentGameClientCallFwd = false;
-	g_iCurrentClientIndexInLoop = -1;
-	g_bShouldChangeGameRulesState = false;
-}
-
-DETOUR_DECL_MEMBER0(CGameClient_ShouldSendMessages, bool)
-{
-	if (!g_bSendSnapshots)
-		return DETOUR_MEMBER_CALL(CGameClient_ShouldSendMessages)();
-	if (g_bCallingForNullClients)
-	{
-		IClient * pClient = (IClient *)((char *)this + 4);
-#if SOURCE_ENGINE == SE_TF2
-		//don't remove this code
-		int iUserID = pClient->GetUserID();
-		IGamePlayer * pPlayer = playerhelpers->GetGamePlayer(pClient->GetPlayerSlot() + 1);
-		if (pPlayer->GetUserId() != iUserID) //if so, there something went wrong, check this now!
-#endif
-		{
-			if (pClient->IsHLTV()
-#if SOURCE_ENGINE == SE_TF2
-			|| pClient->IsReplay()
-#endif
-			|| (pClient->IsConnected() && !pClient->IsActive()))
-				return true; //Also we need to allow connect for inactivated clients, sourcetv & replay
-		}
-		return false;
-	}
-	bool bOriginalResult = DETOUR_MEMBER_CALL(CGameClient_ShouldSendMessages)();
-	if (!bOriginalResult)
-		return false;
-	if ((CGameClient *)this == g_pCurrentGameClientPtr)
-		return true;
-#if defined PLATFORM_x32
-	else
-	{
-		volatile int iToSet = g_iCurrentClientIndexInLoop - 1;
-#if SOURCE_ENGINE == SE_TF2
-#ifdef _WIN32
-		//some little trick to deceive msvc compiler
-		__asm _emit 0x5F
-		__asm _emit 0x5E
-		__asm push edx
-		__asm mov edx, iToSet
-		__asm _emit 0x3B
-		__asm _emit 0xF2
-		__asm jge CompFailed
-		__asm _emit 0x8B
-		__asm _emit 0xF2
-		__asm CompFailed:
-		__asm pop edx
-		__asm _emit 0x56
-		__asm _emit 0x57
-#elif defined __linux__
-		volatile int iTemp;
-		asm volatile("movl %%esi, %0" : "=g" (iTemp));
-		if (iTemp < iToSet)
-			asm volatile(
-				"movl %0, %%esi\n\t"
-				"movl %%esi, %%edx\n\t"
-				"addl $84, %%esp\n\t"
-				"popl %%esi\n\t"
-				"pushl %%edx\n\t"
-				"subl $84, %%esp\n\t"
-				: : "g" (iToSet) : "%edx");
-#endif
-#elif SOURCE_ENGINE == SE_CSGO
-#ifdef _WIN32
-		volatile int iEax, iEdi, iEsi;
-			//save registers
-		__asm mov iEdi, edi
-		__asm mov iEsi, esi
-		__asm mov iEax, eax
-		__asm mov eax, ebp
-			//load stack ptr
-			//we need to pop esi and edi to pop ebp register, we don't care about values in these, we also will use them as variables
-		__asm pop esi
-		__asm pop edi
-		__asm mov edi, iToSet
-		__asm mov esp, ebp
-		__asm pop ebp
-			//load needed info and compare
-		__asm mov esi, [ebp-0x7F8] //0x7F8 is an offset of loop variable
-		__asm cmp esi, edi
-		__asm jge CompFailed
-			//good, store our value
-		__asm mov [ebp-0x7F8], edi
-		__asm CompFailed:
-			//push old and restore original registers
-		__asm push ebp
-		__asm mov ebp, eax
-		__asm mov esp, ebp
-		__asm sub esp, 0x10
-		__asm mov esi, iEsi
-		__asm mov edi, iEdi
-		__asm mov eax, iEax
-		__asm push edi
-		__asm push esi
-#elif defined __linux__
-		volatile int iTemp;
-		//we don't need to clubber edi register here, some low level shit
-		asm volatile("movl %%edi, %0" : "=g" (iTemp));
-		if (iTemp < iToSet)
-			asm volatile("movl %0, %%edi" : : "g" (iToSet));
-#endif
-#endif
-	}
-#endif
-	return false;
-}
 
 #if defined __linux__
 void __attribute__((__cdecl__)) SV_ComputeClientPacks_ActualCall(int iClientCount, CGameClient ** pClients, CFrameSnapshot * pSnapShot);
@@ -436,40 +211,51 @@ DETOUR_DECL_STATIC3(SV_ComputeClientPacks, void, int, iClientCount, CGameClient 
 	//so, here it is __userpurge call, we need manually get our arguments
 	__asm mov iClientCount, ecx
 	__asm mov pClients, edx
-	__asm mov pSnapShot, ebx
+	__asm mov pSnapShot, ebx // @Forgetest: ???Why???
 #endif
-	g_bSVComputePacksDone = false;
-	if (!iClientCount || !g_bSendSnapshots || pClients[0] != g_pCurrentGameClientPtr)
-		return SV_ComputeClientPacks_ActualCall(iClientCount, pClients, pSnapShot);
-	IClient * pClient = (IClient *)((char *)pClients[0] + 4);
-	int iClient = pClient->GetPlayerSlot();
-	if (g_iCurrentClientIndexInLoop != iClient)
-		return SV_ComputeClientPacks_ActualCall(iClientCount, pClients, pSnapShot);
-	//Also here we can change actual values for each client! But for what?
-	//Just mark all hooked edicts as changed to bypass check in SV_PackEntity!
-	for (int i = 0; i < g_vHookedEdicts.Count(); i++)
-	{
-		edict_t * pEdict = g_vHookedEdicts[i];
-		if (pEdict && !pEdict->IsFree() && pEdict->GetUnknown() && !(pEdict->m_fStateFlags & FL_EDICT_CHANGED))
-			pEdict->m_fStateFlags |= FL_EDICT_CHANGED;
-	}
+
+	bool bEdictChanged[MAX_EDICTS];
 	for (int i = 0; i < MAX_EDICTS; ++i)
 	{
-		if (!g_bEdictChanged[i])
+		bEdictChanged[i] = false;
+
+		edict_t *edict = gamehelpers->EdictOfIndex(i);
+		if (!edict || !edict->GetUnknown() || edict->IsFree())
 			continue;
 
-		edict_t *pEdict = gamehelpers->EdictOfIndex(i);
-		if (pEdict && !(pEdict->m_fStateFlags & FL_EDICT_CHANGED))
-			pEdict->m_fStateFlags |= FL_EDICT_CHANGED;
+		if (i > 0 && i <= playerhelpers->GetMaxClients())
+		{
+			if (!playerhelpers->GetGamePlayer(i)->IsInGame())
+				continue;
+		}
+
+		if (!edict->HasStateChanged())
+			continue;
+
+		bEdictChanged[i] = true;
 	}
-	if (g_bShouldChangeGameRulesState && g_pGameRulesProxyEdict)
+
+	g_iCurrentClientIndexInLoop = gamehelpers->IndexOfEdict(pClients[0]->GetEdict()) - 1;
+	SV_ComputeClientPacks_ActualCall(1, &pClients[0], pSnapShot);
+
+	for (int i = 1; i < iClientCount; ++i)
 	{
-		if (!(g_pGameRulesProxyEdict->m_fStateFlags & FL_EDICT_CHANGED))
-			g_pGameRulesProxyEdict->m_fStateFlags |= FL_EDICT_CHANGED;
+		g_iCurrentClientIndexInLoop = gamehelpers->IndexOfEdict(pClients[i]->GetEdict()) - 1;
+
+		CFrameSnapshot *snap = framesnapshotmanager->TakeTickSnapshot(pSnapShot->m_nTickCount);
+
+		for (int i = 0; i < MAX_EDICTS; ++i)
+		{
+			if (bEdictChanged[i])
+			{
+				gamehelpers->EdictOfIndex(i)->m_fStateFlags |= FL_EDICT_CHANGED;
+			}
+		}
+
+		SV_ComputeClientPacks_ActualCall(1, &pClients[i], snap);
 	}
-	if (g_bCurrentGameClientCallFwd)
-		g_bSVComputePacksDone = true;
-	return SV_ComputeClientPacks_ActualCall(iClientCount, pClients, pSnapShot);
+
+	g_iCurrentClientIndexInLoop = -1;
 }
 
 #if defined _WIN32 && SOURCE_ENGINE == SE_CSGO
@@ -479,7 +265,7 @@ __declspec(naked) void __cdecl SV_ComputeClientPacks_ActualCall(int iClientCount
 	__asm mov edx, pClients //we don't care about values in edx & ecx
 	__asm mov ecx, iClientCount
 	__asm mov ebx, pSnapShot
-	__asm push ebx
+	__asm push ebx // @Forgetest: ???Why???
 	__asm call SV_ComputeClientPacks_Actual
 	__asm add esp, 0x4 //restore our stack
 	__asm retn
@@ -657,13 +443,6 @@ void Hook_GameFrame(bool simulating)
 	RETURN_META(MRES_IGNORED);
 }
 
-int SendProxyManager::GetClientCount() const
-{
-	if (g_iCurrentClientIndexInLoop != -1)
-		RETURN_META_VALUE(MRES_SUPERCEDE, g_iCurrentClientIndexInLoop + 1);
-	RETURN_META_VALUE(MRES_IGNORED, 0/*META_RESULT_ORIG_RET(int)*/);
-}
-
 //main sm class implementation
 
 bool SendProxyManager::SDK_OnLoad(char *error, size_t maxlength, bool late)
@@ -684,16 +463,34 @@ bool SendProxyManager::SDK_OnLoad(char *error, size_t maxlength, bool late)
 			snprintf(error, maxlength, "Could not read config file sendproxy.txt: %s", conf_error);
 		return false;
 	}
-	
+
+	if (!g_pGameConf->GetMemSig("CFrameSnapshotManager::TakeTickSnapshot", &CFrameSnapshotManager::s_pfnTakeTickSnapshot))
+	{
+		if (conf_error[0])
+			snprintf(error, maxlength, "Unable to find signature address ""\"CFrameSnapshotManager::TakeTickSnapshot\""" (%s)", conf_error);
+		return false;
+	}
+
+	if (!g_pGameConf->GetOffset("CGameClient::edict", &CGameClient::s_iOffs_edict))
+	{
+		if (conf_error[0])
+			snprintf(error, maxlength, "Unable to find offset ""\"CGameClient::edict\""" (%s)", conf_error);
+		return false;
+	}
+
+	if (!g_pGameConf->GetAddress("framesnapshotmanager", (void**)&framesnapshotmanager))
+	{
+		if (conf_error[0])
+			snprintf(error, maxlength, "Unable to find offset ""\"CGameClient::edict\""" (%s)", conf_error);
+		return false;
+	}
+
 	CDetourManager::Init(smutils->GetScriptingEngine(), g_pGameConf);
 	
 	bool bDetoursInited = false;
-	CREATE_DETOUR(CGameServer_SendClientMessages, "CGameServer::SendClientMessages", bDetoursInited);
-	CREATE_DETOUR(CGameClient_ShouldSendMessages, "CGameClient::ShouldSendMessages", bDetoursInited);
 	CREATE_DETOUR(CFrameSnapshotManager_UsePreviouslySentPacket, "CFrameSnapshotManager::UsePreviouslySentPacket", bDetoursInited);
 	CREATE_DETOUR(CFrameSnapshotManager_GetPreviouslySentPacket, "CFrameSnapshotManager::GetPreviouslySentPacket", bDetoursInited);
 	CREATE_DETOUR(CFrameSnapshotManager_CreatePackedEntity, "CFrameSnapshotManager::CreatePackedEntity", bDetoursInited);
-	// CREATE_DETOUR(CFrameSnapshotManager_RemoveEntityReference, "CFrameSnapshotManager::RemoveEntityReference", bDetoursInited);
 	CREATE_DETOUR_STATIC(SV_ComputeClientPacks, "SV_ComputeClientPacks", bDetoursInited);
 	
 	if (!bDetoursInited)
@@ -707,6 +504,7 @@ bool SendProxyManager::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	
 	sharesys->AddDependency(myself, "sdktools.ext", true, true);
 	sharesys->AddDependency(myself, "sdkhooks.ext", true, true);
+	sharesys->AddDependency(myself, "bintools.ext", true, true);
 	
 	g_pMyInterface = new SendProxyManagerInterfaceImpl();
 	sharesys->AddInterface(myself, g_pMyInterface);
@@ -722,11 +520,43 @@ void SendProxyManager::SDK_OnAllLoaded()
 	sharesys->AddNatives(myself, g_MyNatives);
 	SM_GET_LATE_IFACE(SDKTOOLS, g_pSDKTools);
 	SM_GET_LATE_IFACE(SDKHOOKS, g_pSDKHooks);
+	SM_GET_LATE_IFACE(BINTOOLS, bintools);
 
 	if (g_pSDKHooks)
 	{
 		g_pSDKHooks->AddEntityListener(this);
 	}
+
+	if (bintools)
+	{
+		SourceMod::PassInfo params[] = {
+			{ PassType_Basic, PASSFLAG_BYVAL, sizeof(int), NULL, 0 },
+			{ PassType_Basic, PASSFLAG_BYVAL, sizeof(CFrameSnapshot*), NULL, 0 }
+		};
+
+		CFrameSnapshotManager::s_callTakeTickSnapshot = bintools->CreateCall(CFrameSnapshotManager::s_pfnTakeTickSnapshot, CallConv_ThisCall, &params[1], &params[0], 1);
+		if (CFrameSnapshotManager::s_callTakeTickSnapshot == NULL) {
+			smutils->LogError(myself, "Unable to create ICallWrapper for \"CFrameSnapshotManager::TakeTickSnapshot\"!");
+			return;
+		}
+	}
+}
+
+bool SendProxyManager::QueryInterfaceDrop(SMInterface* pInterface)
+{
+	return pInterface != bintools;
+}
+
+void SendProxyManager::NotifyInterfaceDrop(SMInterface* pInterface)
+{
+	SDK_OnUnload();
+}
+
+bool SendProxyManager::QueryRunning(char* error, size_t maxlength)
+{
+	SM_CHECK_IFACE(BINTOOLS, bintools);
+
+	return true;
 }
 
 void SendProxyManager::SDK_OnUnload()
@@ -743,15 +573,10 @@ void SendProxyManager::SDK_OnUnload()
 	
 	SH_REMOVE_HOOK(IServerGameClients, ClientDisconnect, gameclients, SH_STATIC(Hook_ClientDisconnect), false);
 	SH_REMOVE_HOOK(IServerGameDLL, GameFrame, gamedll, SH_STATIC(Hook_GameFrame), false);
-	if (!g_bFirstTimeCalled)
-		SH_REMOVE_HOOK(IServer, GetClientCount, g_pIServer, SH_MEMBER(this, &SendProxyManager::GetClientCount), false);
 
-	DESTROY_DETOUR(CGameServer_SendClientMessages);
-	DESTROY_DETOUR(CGameClient_ShouldSendMessages);
 	DESTROY_DETOUR(CFrameSnapshotManager_UsePreviouslySentPacket);
 	DESTROY_DETOUR(CFrameSnapshotManager_GetPreviouslySentPacket);
 	DESTROY_DETOUR(CFrameSnapshotManager_CreatePackedEntity);
-	// DESTROY_DETOUR(CFrameSnapshotManager_RemoveEntityReference);
 	DESTROY_DETOUR(SV_ComputeClientPacks);
 	
 	gameconfs->CloseGameConfigFile(g_pGameConf);
@@ -805,8 +630,6 @@ bool SendProxyManager::SDK_OnMetamodLoad(ISmmAPI *ismm, char *error, size_t maxl
 	GET_V_IFACE_ANY(GetServerFactory, gameents, IServerGameEnts, INTERFACEVERSION_SERVERGAMEENTS);
 	GET_V_IFACE_ANY(GetServerFactory, gameclients, IServerGameClients, INTERFACEVERSION_SERVERGAMECLIENTS);
 	GET_V_IFACE_ANY(GetEngineFactory, g_pCVar, ICvar, CVAR_INTERFACE_VERSION);
-	
-	g_pGlobals = ismm->GetCGlobals();
 	
 	SH_ADD_HOOK(IServerGameDLL, GameFrame, gamedll, SH_STATIC(Hook_GameFrame), false);
 	SH_ADD_HOOK(IServerGameClients, ClientDisconnect, gameclients, SH_STATIC(Hook_ClientDisconnect), false);
@@ -888,8 +711,6 @@ bool SendProxyManager::AddHookToList(SendPropHook hook)
 		}
 	}
 	g_Hooks.AddToTail(hook);
-	if (!bEdictHooked)
-		g_vHookedEdicts.AddToTail(hook.pEnt);
 	return true;
 }
 
@@ -1007,12 +828,6 @@ void SendProxyManager::UnhookProxy(int i)
 			return;
 		}
 	}
-	for (int j = 0; j < g_vHookedEdicts.Count(); j++)
-		if (g_vHookedEdicts[j] == g_Hooks[i].pEnt)
-		{
-			g_vHookedEdicts.Remove(j);
-			break;
-		}
 	CallListenersForHookID(i);
 	g_Hooks[i].pVar->SetProxyFn(g_Hooks[i].pRealProxy);
 	g_Hooks.Remove(i);
@@ -1224,9 +1039,6 @@ void CallChangeGamerulesCallbacks(PropChangeHookGamerules * pInfo, void * pOldVa
 
 bool CallInt(SendPropHook &hook, int *ret, int iElement)
 {
-	if (!g_bSVComputePacksDone)
-		return false;
-	
 	AUTO_LOCK_FM(g_WorkMutex);
 
 	if (!hook.pVar->IsInsideArray())
@@ -1270,9 +1082,6 @@ bool CallInt(SendPropHook &hook, int *ret, int iElement)
 
 bool CallIntGamerules(SendPropHookGamerules &hook, int *ret, int iElement)
 {
-	if (!g_bSVComputePacksDone)
-		return false;
-	
 	AUTO_LOCK_FM(g_WorkMutex);
 
 	if (!hook.pVar->IsInsideArray())
@@ -1315,9 +1124,6 @@ bool CallIntGamerules(SendPropHookGamerules &hook, int *ret, int iElement)
 
 bool CallFloat(SendPropHook &hook, float *ret, int iElement)
 {
-	if (!g_bSVComputePacksDone)
-		return false;
-	
 	AUTO_LOCK_FM(g_WorkMutex);
 	
 	if (!hook.pVar->IsInsideArray())
@@ -1361,9 +1167,6 @@ bool CallFloat(SendPropHook &hook, float *ret, int iElement)
 
 bool CallFloatGamerules(SendPropHookGamerules &hook, float *ret, int iElement)
 {
-	if (!g_bSVComputePacksDone)
-		return false;
-	
 	AUTO_LOCK_FM(g_WorkMutex);
 
 	if (!hook.pVar->IsInsideArray())
@@ -1406,9 +1209,6 @@ bool CallFloatGamerules(SendPropHookGamerules &hook, float *ret, int iElement)
 
 bool CallString(SendPropHook &hook, char **ret, int iElement)
 {
-	if (!g_bSVComputePacksDone)
-		return false;
-	
 	AUTO_LOCK_FM(g_WorkMutex);
 
 	if (!hook.pVar->IsInsideArray())
@@ -1453,9 +1253,6 @@ bool CallString(SendPropHook &hook, char **ret, int iElement)
 
 bool CallStringGamerules(SendPropHookGamerules &hook, char **ret, int iElement)
 {
-	if (!g_bSVComputePacksDone)
-		return false;
-	
 	AUTO_LOCK_FM(g_WorkMutex);
 
 	if (!hook.pVar->IsInsideArray())
@@ -1508,9 +1305,6 @@ bool CallStringGamerules(SendPropHookGamerules &hook, char **ret, int iElement)
 
 bool CallVector(SendPropHook &hook, Vector &vec, int iElement)
 {
-	if (!g_bSVComputePacksDone)
-		return false;
-	
 	AUTO_LOCK_FM(g_WorkMutex);
 
 	if (!hook.pVar->IsInsideArray())
@@ -1563,9 +1357,6 @@ bool CallVector(SendPropHook &hook, Vector &vec, int iElement)
 
 bool CallVectorGamerules(SendPropHookGamerules &hook, Vector &vec, int iElement)
 {
-	if (!g_bSVComputePacksDone)
-		return false;
-	
 	AUTO_LOCK_FM(g_WorkMutex);
 
 	if (!hook.pVar->IsInsideArray())
@@ -1713,9 +1504,6 @@ void GlobalProxy(const SendProp *pProp, const void *pStructBase, const void * pD
 
 void GlobalProxyGamerules(const SendProp *pProp, const void *pStructBase, const void * pData, DVariant *pOut, int iElement, int objectID)
 {
-	if (!g_bShouldChangeGameRulesState)
-		g_bShouldChangeGameRulesState = true; //If this called once, so, the props wants to be sent at this time, and we should do this for all clients!
-	
 	bool bHandled = false;
 	for (int i = 0; i < g_HooksGamerules.Count(); i++)
 	{

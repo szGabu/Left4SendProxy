@@ -1,6 +1,7 @@
 #ifndef _WRAPPERS_H_INC_
 #define _WRAPPERS_H_INC_
 
+#include <extensions/IBinTools.h>
 #include "tier0/threadtools.h"
 #include "tier1/utlvector.h"
 #include "tier1/utllinkedlist.h"
@@ -41,31 +42,31 @@ public:
 	CInterlockedInt			m_nReferences;
 };
 
-class PackedEntity
-{
-public:
-	ServerClass *m_pServerClass;	// Valid on the server
-	ClientClass	*m_pClientClass;	// Valid on the client
-		
-	int			m_nEntityIndex;		// Entity index.
-	CInterlockedInt 	m_ReferenceCount;	// reference count;
-};
+class PackedEntity;
 
 #define INVALID_PACKED_ENTITY_HANDLE (0)
 typedef int PackedEntityHandle_t;
 
-typedef struct
-{
-	PackedEntity	*pEntity;	// original packed entity
-	int				counter;	// increaseing counter to find LRU entries
-	int				bits;		// uncompressed data length in bits
-	char			data[MAX_PACKEDENTITY_DATA]; // uncompressed data cache
-} UnpackedDataCache_t;
-
+struct UnpackedDataCache_t;
 class CFrameSnapshotManager
 {
 public:
 	virtual ~CFrameSnapshotManager( void );
+
+	static void* s_pfnTakeTickSnapshot;
+	static ICallWrapper* s_callTakeTickSnapshot;
+
+	CFrameSnapshot* TakeTickSnapshot(int tickcount)
+	{
+		struct {
+			CFrameSnapshotManager *pThis;
+			int tickcount;
+		} stack{ this, tickcount };
+
+		CFrameSnapshot *ret;
+		s_callTakeTickSnapshot->Execute(&stack, &ret);
+		return ret;
+	}
 
 public:
 	int pad[21];
@@ -86,5 +87,18 @@ public:
 
 	CUtlVector<int>			m_iExplicitDeleteSlots;
 };
+
+class CGameClient
+{
+public:
+	static int s_iOffs_edict;
+
+	edict_t* GetEdict()
+	{
+		return *(edict_t**)(reinterpret_cast<const byte*>(this) + s_iOffs_edict);
+	}
+};
+
+extern CFrameSnapshotManager* framesnapshotmanager;
 
 #endif

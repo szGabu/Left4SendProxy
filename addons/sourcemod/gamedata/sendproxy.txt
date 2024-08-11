@@ -8,8 +8,34 @@
 			"game"	"left4dead2"
 		}
 
+		"Offsets"
+		{
+			"CGameClient::edict"
+			{
+				"linux"				"120656"
+			}
+		}
+
+		"Addresses"
+		{
+			"framesnapshotmanager"
+			{
+				"linux"
+				{
+					"signature"		"framesnapshotmanager"
+				}
+				"read"	"0"
+			}
+		}
+
 		"Signatures"
 		{
+			"framesnapshotmanager"
+			{
+				"library"			"engine"
+				"linux"				"@framesnapshotmanager"
+			}
+
 			"CGameClient::ShouldSendMessages"
 			{
 				"library"			"engine"
@@ -51,6 +77,11 @@
 				"library"			"engine"
 				"linux"				"@_ZN21CFrameSnapshotManager21RemoveEntityReferenceEi"
 				"windows"			"\x55\x8B\xEC\x51\x8B\x45\x08\x53\x8B\x18"
+			}
+			"CFrameSnapshotManager::TakeTickSnapshot"
+			{
+				"library"			"engine"
+				"linux"				"@_ZN21CFrameSnapshotManager16TakeTickSnapshotEi"
 			}
 		}
 	}

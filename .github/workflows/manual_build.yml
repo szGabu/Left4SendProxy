@@ -104,7 +104,7 @@ jobs:
       - name: Get latest tag
         id: tag
         run: |
-          echo "TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
+          echo "TAG=$(curl -s "https://api.github.com/repos/${{ github.repository }}/tags" | jq -r ".[0].name")" >> $GITHUB_ENV
       - name: Zip sourcemod directory (Linux)
         run: |
           (cd /tmp/Left4SendProxy/linux/sourcemod/ && zip -r /tmp/linux_release.zip .)

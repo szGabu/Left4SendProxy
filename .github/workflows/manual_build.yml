@@ -110,7 +110,7 @@ jobs:
         run: |
           find /tmp/Left4SendProxy/windows/sourcemod/extensions -type f -name "*.dll" -exec mv -n {} /tmp/Left4SendProxy/linux/sourcemod/extensions \;
           cd /tmp/Left4SendProxy/linux/sourcemod/ 
-          zip -r /tmp/release.zip .
+          zip -r /tmp/Release.zip .
 
       - name: Create Release
         uses: softprops/action-gh-release@v1

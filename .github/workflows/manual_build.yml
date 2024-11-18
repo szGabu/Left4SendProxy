@@ -108,7 +108,7 @@ jobs:
 
       - name: Zip sourcemod directory # are these all the files?
         run: |
-          mv -f /tmp/Left4SendProxy/windows/sourcemod/* /tmp/Left4SendProxy/linux/sourcemod/ 
+          find /tmp/Left4SendProxy/windows/sourcemod/extensions -type f -name "*.dll" -exec mv -n {} /tmp/Left4SendProxy/linux/sourcemod/extensions \;
           cd /tmp/Left4SendProxy/linux/sourcemod/ 
           zip -r /tmp/release.zip .
 

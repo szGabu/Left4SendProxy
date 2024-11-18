@@ -108,7 +108,7 @@ jobs:
 
       - name: Zip sourcemod directory # are these all the files?
         run: |
-          mv /tmp/Left4SendProxy/windows/sourcemod/* /tmp/Left4SendProxy/linux/sourcemod/ 
+          mv -f /tmp/Left4SendProxy/windows/sourcemod/* /tmp/Left4SendProxy/linux/sourcemod/ 
           cd /tmp/Left4SendProxy/linux/sourcemod/ 
           zip -r /tmp/release.zip .
 

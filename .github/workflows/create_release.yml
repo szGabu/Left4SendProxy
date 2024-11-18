@@ -107,18 +107,18 @@ jobs:
         id: tag
         run: |
           echo "TAG=$(curl -s "https://api.github.com/repos/${{ github.repository }}/tags" | jq -r ".[0].name")" >> $GITHUB_ENV
-      - name: Zip sourcemod directory (Linux)
+
+      - name: Zip sourcemod directory # are these all the files?
         run: |
-          (cd /tmp/Left4SendProxy/linux/sourcemod/ && zip -r /tmp/linux_release.zip .)
-      - name: Zip sourcemod directory (Windows)
-        run: |
-          (cd /tmp/Left4SendProxy/windows/sourcemod/ && zip -r /tmp/windows_release.zip .)
+          find /tmp/Left4SendProxy/windows/sourcemod/extensions -type f -name "*.dll" -exec mv -n {} /tmp/Left4SendProxy/linux/sourcemod/extensions \;
+          cd /tmp/Left4SendProxy/linux/sourcemod/ 
+          zip -r /tmp/Release.zip .
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.TAG }}
           files: |
-            /tmp/linux_release.zip
-            /tmp/windows_release.zip
+            /tmp/Release.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

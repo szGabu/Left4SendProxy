@@ -5,103 +5,118 @@ on:
 jobs:
   build:
     name: Build Project
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
 
-      - name: Setup Environment
+      - name: Set GITHUB_SHA_SHORT
         shell: bash
         run: |
           echo "GITHUB_SHA_SHORT=${GITHUB_SHA::7}" >> $GITHUB_ENV
-          
-      - name: Install Dependencies
+      - name: Install Dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update
-          sudo apt-get install -y clang g++-multilib
-          # sudo apt-get install -y g++-multilib gcc-multilib
-          sudo apt-get install -y git python3-pip
+          sudo apt-get install -y clang g++-multilib git python3-pip
           echo "CC=clang" >> $GITHUB_ENV
           echo "CXX=clang++" >> $GITHUB_ENV
-
-      - name: Prepare Alliedmodders Directory
+      - name: Build Extension (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
         run: |
           mkdir alliedmodders
-
-      - name: Prepare Sourcemod
-        run: |
           cd alliedmodders
           git clone --recursive https://github.com/alliedmodders/sourcemod -b 1.11-dev
-
-      - name: Prepare L4D SDK
-        run: |
-          cd alliedmodders
           git clone --mirror https://github.com/alliedmodders/hl2sdk hl2sdk-proxy-repo
           git clone hl2sdk-proxy-repo hl2sdk-l4d2 -b l4d2
           git clone hl2sdk-proxy-repo hl2sdk-l4d -b l4d
-          
-      - name: Prepare Metamod Source
-        run: |
-          cd alliedmodders
           git clone https://github.com/alliedmodders/metamod-source mmsource-1.10 -b 1.10-dev
-
-      - name: Install AMBuild
-        run: |
-          cd alliedmodders
           git clone https://github.com/alliedmodders/ambuild
-          pip install ./ambuild
-
-      - name: Configure AMBuild
-        run: |
-          cd extension
+          pip3 install ./ambuild
+          cd ../extension
           mkdir build
           cd build
           python3 ../configure.py --hl2sdk-root=../../alliedmodders --sm-path=../../alliedmodders/sourcemod --mms-path=../../alliedmodders/mmsource-1.10 --sdks l4d,l4d2
-
-      - name: Run AMBuild
-        run: |
-          cd extension
-          cd build
           ambuild
-
-      - name: Copy to addons directory
+          mkdir -p ../../addons/sourcemod
+          cp -r package/addons/sourcemod/extensions ../../addons/sourcemod
+      - name: Build Extension (Windows - 32-bit)
+        if: runner.os == 'Windows'
+        shell: cmd
         run: |
-          cp -r /home/runner/work/Left4SendProxy/Left4SendProxy/extension/build/package/addons/sourcemod/extensions /home/runner/work/Left4SendProxy/Left4SendProxy/addons/sourcemod
-
+          python --version
+          python -m pip install --upgrade pip
+          pip install pywin32
+          pip install setuptools wheel
+          REM Find the Visual Studio installation path
+          FOR /F "tokens=*" %%i IN ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath') DO SET InstallDir=%%i
+          REM Set up MSVC environment for 32-bit (x86) build
+          call "%InstallDir%\Common7\Tools\VsDevCmd.bat" -arch=x86
+          REM Proceed with the build
+          mkdir alliedmodders
+          cd alliedmodders
+          git clone --recursive https://github.com/alliedmodders/sourcemod -b 1.11-dev
+          git clone --mirror https://github.com/alliedmodders/hl2sdk hl2sdk-proxy-repo
+          git clone hl2sdk-proxy-repo hl2sdk-l4d2 -b l4d2
+          git clone hl2sdk-proxy-repo hl2sdk-l4d -b l4d
+          git clone https://github.com/alliedmodders/metamod-source mmsource-1.10 -b 1.10-dev
+          git clone https://github.com/alliedmodders/ambuild
+          pip install ./ambuild
+          cd ..\extension
+          mkdir build
+          cd build
+          python ..\configure.py --hl2sdk-root=..\..\alliedmodders --sm-path=..\..\alliedmodders\sourcemod --mms-path=..\..\alliedmodders\mmsource-1.10 --sdks l4d,l4d2
+          ambuild
+          mkdir ..\..\addons\sourcemod\extensions
+          xcopy /E /I /Y package\addons\sourcemod\extensions ..\..\addons\sourcemod\extensions
       - name: Upload Binary (Package)
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
-          name: sendproxy
-          path: /home/runner/work/Left4SendProxy/Left4SendProxy/addons
+          name: sendproxy-${{ matrix.os }}
+          path: ./addons
 
   release:
     name: Create Release
     needs: build
     runs-on: ubuntu-latest
-    
+
     steps:
-      - name: Download Artifact
-        uses: actions/download-artifact@v2
+      - name: Download Artifact (Linux)
+        uses: actions/download-artifact@v4
+        if: always()
         with:
-          name: sendproxy
-          path: /tmp/Left4SendProxy
+          name: sendproxy-ubuntu-latest
+          path: /tmp/Left4SendProxy/linux
+
+      - name: Download Artifact (Windows)
+        uses: actions/download-artifact@v4
+        if: always()
+        with:
+          name: sendproxy-windows-latest
+          path: /tmp/Left4SendProxy/windows
 
       - name: Get latest tag
         id: tag
         run: |
-          echo "TAG=$(curl -s "https://api.github.com/repos/${{ github.repository }}/tags" | jq -r ".[0].name")" >> $GITHUB_ENV
-
-      - name: Zip sourcemod directory
-        run: (cd /tmp/Left4SendProxy/sourcemod/ && zip -r /tmp/linux_release.zip .)
-
-        
+          echo "TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
+      - name: Zip sourcemod directory (Linux)
+        run: |
+          (cd /tmp/Left4SendProxy/linux/sourcemod/ && zip -r /tmp/linux_release.zip .)
+      - name: Zip sourcemod directory (Windows)
+        run: |
+          (cd /tmp/Left4SendProxy/windows/sourcemod/ && zip -r /tmp/windows_release.zip .)
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.TAG }}
-          files: /tmp/linux_release.zip
+          files: |
+            /tmp/linux_release.zip
+            /tmp/windows_release.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

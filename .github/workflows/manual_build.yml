@@ -108,13 +108,15 @@ jobs:
 
       - name: Zip sourcemod directory # are these all the files?
         run: |
-          (cd /tmp/Left4SendProxy/linux/sourcemod/ && zip -r /tmp/release.zip .)
-          
+          mv /tmp/Left4SendProxy/windows/sourcemod/* /tmp/Left4SendProxy/linux/sourcemod/ 
+          cd /tmp/Left4SendProxy/linux/sourcemod/ 
+          zip -r /tmp/release.zip .
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.TAG }}
           files: |
-            /tmp/release.zip
+            /tmp/Release.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

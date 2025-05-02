@@ -59,6 +59,10 @@ SH_DECL_HOOK0(IServer, GetClientCount, const, false, int);
 
 DECL_DETOUR(CGameServer_SendClientMessages);
 DECL_DETOUR(CGameClient_ShouldSendMessages);
+DECL_DETOUR(CFrameSnapshotManager_UsePreviouslySentPacket);
+DECL_DETOUR(CFrameSnapshotManager_GetPreviouslySentPacket);
+DECL_DETOUR(CFrameSnapshotManager_CreatePackedEntity);
+// DECL_DETOUR(CFrameSnapshotManager_RemoveEntityReference);
 DECL_DETOUR(SV_ComputeClientPacks);
 
 class CGameClient;
@@ -97,9 +101,13 @@ ConVar * sv_parallel_packentities = nullptr;
 ConVar * sv_parallel_sendsnapshot = nullptr;
 
 edict_t * g_pGameRulesProxyEdict = nullptr;
+int g_iGameRulesProxyIndex = -1;
+PackedEntityHandle_t g_PlayersPackedGameRules[SM_MAXPLAYERS] = {INVALID_PACKED_ENTITY_HANDLE};
 void * g_pGameRules = nullptr;
 bool g_bShouldChangeGameRulesState = false;
 bool g_bSendSnapshots = false;
+
+bool g_bEdictChanged[MAX_EDICTS] = {false};
 
 CGlobalVars * g_pGlobals = nullptr;
 
@@ -121,6 +129,115 @@ const char * g_szGameRulesProxy;
 	6. SendTable_EncodeProp //here the ProxyFn will be called
 	7. ProxyFn //here our callbacks is called
 */
+
+#ifndef DEBUG
+// #define _FORCE_DEBUG
+
+#ifdef _FORCE_DEBUG
+#define DEBUG
+#endif
+
+#endif // #ifndef DEBUG
+
+DETOUR_DECL_MEMBER3(CFrameSnapshotManager_UsePreviouslySentPacket, bool, CFrameSnapshot*, pSnapshot, int, entity, int, entSerialNumber)
+{
+	if (g_iCurrentClientIndexInLoop == -1
+	 || !g_bCurrentGameClientCallFwd
+	 || entity != g_iGameRulesProxyIndex)
+	{
+		return DETOUR_MEMBER_CALL(CFrameSnapshotManager_UsePreviouslySentPacket)(pSnapshot, entity, entSerialNumber);
+	}
+
+	if (g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop] == INVALID_PACKED_ENTITY_HANDLE)
+		return false;
+
+	CFrameSnapshotManager *framesnapshotmanager = (CFrameSnapshotManager *)this;
+	framesnapshotmanager->m_pLastPackedData[entity] = g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop];
+	return DETOUR_MEMBER_CALL(CFrameSnapshotManager_UsePreviouslySentPacket)(pSnapshot, entity, entSerialNumber);
+}
+
+DETOUR_DECL_MEMBER2(CFrameSnapshotManager_GetPreviouslySentPacket, PackedEntity*, int, entity, int, entSerialNumber)
+{
+	if (g_iCurrentClientIndexInLoop == -1
+	 || !g_bCurrentGameClientCallFwd
+	 || entity != g_iGameRulesProxyIndex)
+	{
+		return DETOUR_MEMBER_CALL(CFrameSnapshotManager_GetPreviouslySentPacket)(entity, entSerialNumber);
+	}
+
+	CFrameSnapshotManager *framesnapshotmanager = (CFrameSnapshotManager *)this;
+	
+#ifdef DEBUG
+	char buffer[128];
+	smutils->Format(buffer, sizeof(buffer), "GetPreviouslySentPacket (%d / %d)", framesnapshotmanager->m_pLastPackedData[entity], g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop]);
+	gamehelpers->TextMsg(g_iCurrentClientIndexInLoop+1, 3, buffer);
+#endif
+
+	framesnapshotmanager->m_pLastPackedData[entity] = g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop];
+	return DETOUR_MEMBER_CALL(CFrameSnapshotManager_GetPreviouslySentPacket)(entity, entSerialNumber);
+}
+
+DETOUR_DECL_MEMBER2(CFrameSnapshotManager_CreatePackedEntity, PackedEntity*, CFrameSnapshot*, pSnapshot, int, entity)
+{
+	if (g_iCurrentClientIndexInLoop == -1
+	 || !g_bCurrentGameClientCallFwd
+	 || entity != g_iGameRulesProxyIndex)
+	{
+		return DETOUR_MEMBER_CALL(CFrameSnapshotManager_CreatePackedEntity)(pSnapshot, entity);
+	}
+
+	CFrameSnapshotManager *framesnapshotmanager = (CFrameSnapshotManager *)this;
+	PackedEntityHandle_t origHandle = framesnapshotmanager->m_pLastPackedData[entity];
+
+	if (g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop] != INVALID_PACKED_ENTITY_HANDLE)
+		framesnapshotmanager->m_pLastPackedData[entity] = g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop];
+	PackedEntity *result = DETOUR_MEMBER_CALL(CFrameSnapshotManager_CreatePackedEntity)(pSnapshot, entity);
+	g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop] = framesnapshotmanager->m_pLastPackedData[entity];
+
+#ifdef DEBUG
+	char buffer[128];
+	smutils->Format(buffer, sizeof(buffer), "CreatePackedEntity (%d / %d / %d)", origHandle, g_PlayersPackedGameRules[g_iCurrentClientIndexInLoop], framesnapshotmanager->m_pLastPackedData[entity]);
+	gamehelpers->TextMsg(g_iCurrentClientIndexInLoop+1, 3, buffer);
+#endif
+
+	return result;
+}
+
+// DETOUR_DECL_MEMBER1(CFrameSnapshotManager_RemoveEntityReference, void, PackedEntityHandle_t, handle)
+// {
+// 	CFrameSnapshotManager *framesnapshotmanager = (CFrameSnapshotManager *)this;
+
+// 	PackedEntity *packedEntity = framesnapshotmanager->m_PackedEntities[handle];
+// 	if ( packedEntity->m_ReferenceCount <= 1)
+// 	{
+// 		for (int i = 0; i < (sizeof(g_PlayersPackedGameRules) / sizeof(g_PlayersPackedGameRules[0])); ++i)
+// 		{
+// 			if (g_PlayersPackedGameRules[i] == handle)
+// 			{
+// 				g_PlayersPackedGameRules[i] = INVALID_PACKED_ENTITY_HANDLE;
+
+// 			#ifdef DEBUG
+// 				char buffer[128];
+// 				for (int client = 1; client <= playerhelpers->GetMaxClients(); client++)
+// 				{
+// 					IGamePlayer *plr = playerhelpers->GetGamePlayer(client);
+// 					if (plr && plr->IsInGame() && !plr->IsFakeClient())
+// 					{
+// 						smutils->Format(buffer, sizeof(buffer), "RemoveEntityReference: (%d / %d)", handle, i + 1);
+// 						gamehelpers->TextMsg(client, 3, buffer);
+// 					}
+// 				}
+// 			#endif
+// 			}
+// 		}
+// 	}
+
+// 	DETOUR_MEMBER_CALL(CFrameSnapshotManager_RemoveEntityReference)(handle);
+// }
+
+#ifdef _FORCE_DEBUG
+#undef DEBUG
+#endif
 
 DETOUR_DECL_MEMBER1(CGameServer_SendClientMessages, void, bool, bSendSnapshots)
 {
@@ -144,6 +261,27 @@ DETOUR_DECL_MEMBER1(CGameServer_SendClientMessages, void, bool, bSendSnapshots)
 		SH_ADD_HOOK(IServer, GetClientCount, g_pIServer, SH_MEMBER(&g_SendProxyManager, &SendProxyManager::GetClientCount), false);
 		g_bFirstTimeCalled = false;
 	}
+
+	for (int i = 0; i < MAX_EDICTS; ++i)
+	{
+		g_bEdictChanged[i] = false;
+
+		edict_t *edict = gamehelpers->EdictOfIndex(i);
+		if (!edict || !edict->GetUnknown() || edict->IsFree())
+			continue;
+
+		if (i > 0 && i <= playerhelpers->GetMaxClients())
+		{
+			if (!g_pIServer->GetClient(i-1)->IsActive())
+				continue;
+		}
+
+		if (!edict->HasStateChanged())
+			continue;
+
+		g_bEdictChanged[i] = true;
+	}
+
 	bool bCalledForNullIClientsThisTime = false;
 	for (int iClients = 1; iClients <= playerhelpers->GetMaxClients(); iClients++)
 	{
@@ -312,6 +450,15 @@ DETOUR_DECL_STATIC3(SV_ComputeClientPacks, void, int, iClientCount, CGameClient 
 	for (int i = 0; i < g_vHookedEdicts.Count(); i++)
 	{
 		edict_t * pEdict = g_vHookedEdicts[i];
+		if (pEdict && !pEdict->IsFree() && pEdict->GetUnknown() && !(pEdict->m_fStateFlags & FL_EDICT_CHANGED))
+			pEdict->m_fStateFlags |= FL_EDICT_CHANGED;
+	}
+	for (int i = 0; i < MAX_EDICTS; ++i)
+	{
+		if (!g_bEdictChanged[i])
+			continue;
+
+		edict_t *pEdict = gamehelpers->EdictOfIndex(i);
 		if (pEdict && !(pEdict->m_fStateFlags & FL_EDICT_CHANGED))
 			pEdict->m_fStateFlags |= FL_EDICT_CHANGED;
 	}
@@ -381,6 +528,10 @@ void Hook_ClientDisconnect(edict_t * pEnt)
 		if (g_ChangeHooks[i].objectID == gamehelpers->IndexOfEdict(pEnt))
 			g_ChangeHooks.Remove(i--);
 	}
+
+	if (gamehelpers->IndexOfEdict(pEnt) != -1)
+		g_PlayersPackedGameRules[gamehelpers->IndexOfEdict(pEnt)] = INVALID_PACKED_ENTITY_HANDLE;
+
 	RETURN_META(MRES_IGNORED);
 }
 
@@ -539,6 +690,10 @@ bool SendProxyManager::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	bool bDetoursInited = false;
 	CREATE_DETOUR(CGameServer_SendClientMessages, "CGameServer::SendClientMessages", bDetoursInited);
 	CREATE_DETOUR(CGameClient_ShouldSendMessages, "CGameClient::ShouldSendMessages", bDetoursInited);
+	CREATE_DETOUR(CFrameSnapshotManager_UsePreviouslySentPacket, "CFrameSnapshotManager::UsePreviouslySentPacket", bDetoursInited);
+	CREATE_DETOUR(CFrameSnapshotManager_GetPreviouslySentPacket, "CFrameSnapshotManager::GetPreviouslySentPacket", bDetoursInited);
+	CREATE_DETOUR(CFrameSnapshotManager_CreatePackedEntity, "CFrameSnapshotManager::CreatePackedEntity", bDetoursInited);
+	// CREATE_DETOUR(CFrameSnapshotManager_RemoveEntityReference, "CFrameSnapshotManager::RemoveEntityReference", bDetoursInited);
 	CREATE_DETOUR_STATIC(SV_ComputeClientPacks, "SV_ComputeClientPacks", bDetoursInited);
 	
 	if (!bDetoursInited)
@@ -581,6 +736,11 @@ void SendProxyManager::SDK_OnUnload()
 		g_Hooks[i].pVar->SetProxyFn(g_Hooks[i].pRealProxy);
 	}
 	
+	for (int i = 0; i < g_HooksGamerules.Count(); i++)
+	{
+		g_HooksGamerules[i].pVar->SetProxyFn(g_HooksGamerules[i].pRealProxy);
+	}
+	
 	SH_REMOVE_HOOK(IServerGameClients, ClientDisconnect, gameclients, SH_STATIC(Hook_ClientDisconnect), false);
 	SH_REMOVE_HOOK(IServerGameDLL, GameFrame, gamedll, SH_STATIC(Hook_GameFrame), false);
 	if (!g_bFirstTimeCalled)
@@ -588,6 +748,10 @@ void SendProxyManager::SDK_OnUnload()
 
 	DESTROY_DETOUR(CGameServer_SendClientMessages);
 	DESTROY_DETOUR(CGameClient_ShouldSendMessages);
+	DESTROY_DETOUR(CFrameSnapshotManager_UsePreviouslySentPacket);
+	DESTROY_DETOUR(CFrameSnapshotManager_GetPreviouslySentPacket);
+	DESTROY_DETOUR(CFrameSnapshotManager_CreatePackedEntity);
+	// DESTROY_DETOUR(CFrameSnapshotManager_RemoveEntityReference);
 	DESTROY_DETOUR(SV_ComputeClientPacks);
 	
 	gameconfs->CloseGameConfigFile(g_pGameConf);
@@ -608,13 +772,19 @@ void SendProxyManager::OnCoreMapEnd()
 		UnhookProxyGamerules(i);
 		i--;
 	}
-	
+
 	g_pGameRulesProxyEdict = nullptr;
+	g_iGameRulesProxyIndex = -1;
 }
 
 void SendProxyManager::OnCoreMapStart(edict_t * pEdictList, int edictCount, int clientMax)
 {
-	CBaseEntity * pGameRulesProxyEnt = FindEntityByServerClassname(0, g_szGameRulesProxy);
+	for (int i = 0; i < (sizeof(g_PlayersPackedGameRules) / sizeof(g_PlayersPackedGameRules[0])); ++i)
+	{
+		g_PlayersPackedGameRules[i] = INVALID_PACKED_ENTITY_HANDLE;
+	}
+
+	CBaseEntity *pGameRulesProxyEnt = FindEntityByServerClassname(0, g_szGameRulesProxy);
 	if (!pGameRulesProxyEnt)
 	{
 		smutils->LogError(myself, "Unable to get gamerules proxy ent (1)!");
@@ -623,6 +793,11 @@ void SendProxyManager::OnCoreMapStart(edict_t * pEdictList, int edictCount, int 
 	g_pGameRulesProxyEdict = gameents->BaseEntityToEdict(pGameRulesProxyEnt);
 	if (!g_pGameRulesProxyEdict)
 		smutils->LogError(myself, "Unable to get gamerules proxy ent (2)!");
+	
+	if (g_pGameRulesProxyEdict)
+	{
+		g_iGameRulesProxyIndex = gamehelpers->IndexOfEdict(g_pGameRulesProxyEdict);
+	}
 }
 
 bool SendProxyManager::SDK_OnMetamodLoad(ISmmAPI *ismm, char *error, size_t maxlen, bool late)
@@ -1047,12 +1222,15 @@ void CallChangeGamerulesCallbacks(PropChangeHookGamerules * pInfo, void * pOldVa
 
 //Proxy
 
-bool CallInt(SendPropHook hook, int *ret)
+bool CallInt(SendPropHook &hook, int *ret, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
 	
 	AUTO_LOCK_FM(g_WorkMutex);
+
+	if (!hook.pVar->IsInsideArray())
+		iElement = hook.Element;
 
 	switch (hook.sCallbackInfo.iCallbackType)
 	{
@@ -1064,7 +1242,7 @@ bool CallInt(SendPropHook hook, int *ret)
 			callback->PushCell(hook.objectID);
 			callback->PushString(hook.pVar->GetName());
 			callback->PushCellByRef(&value);
-			callback->PushCell(hook.Element);
+			callback->PushCell(iElement);
 			callback->PushCell(g_iCurrentClientIndexInLoop + 1);
 			callback->Execute(&result);
 			if (result == Pl_Changed)
@@ -1078,7 +1256,7 @@ bool CallInt(SendPropHook hook, int *ret)
 		{
 			ISendProxyCallbacks * pCallbacks = (ISendProxyCallbacks *)hook.sCallbackInfo.pCallback;
 			int iValue = *ret;
-			bool bChange = pCallbacks->OnEntityPropProxyFunctionCalls(gameents->EdictToBaseEntity(hook.pEnt), hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&iValue, hook.PropType, hook.Element);
+			bool bChange = pCallbacks->OnEntityPropProxyFunctionCalls(gameents->EdictToBaseEntity(hook.pEnt), hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&iValue, hook.PropType, iElement);
 			if (bChange)
 			{
 				*ret = iValue;
@@ -1090,12 +1268,15 @@ bool CallInt(SendPropHook hook, int *ret)
 	return false;
 }
 
-bool CallIntGamerules(SendPropHookGamerules hook, int *ret)
+bool CallIntGamerules(SendPropHookGamerules &hook, int *ret, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
 	
 	AUTO_LOCK_FM(g_WorkMutex);
+
+	if (!hook.pVar->IsInsideArray())
+		iElement = hook.Element;
 
 	switch (hook.sCallbackInfo.iCallbackType)
 	{
@@ -1106,7 +1287,7 @@ bool CallIntGamerules(SendPropHookGamerules hook, int *ret)
 			cell_t result = Pl_Continue;
 			callback->PushString(hook.pVar->GetName());
 			callback->PushCellByRef(&value);
-			callback->PushCell(hook.Element);
+			callback->PushCell(iElement);
 			callback->PushCell(g_iCurrentClientIndexInLoop + 1);
 			callback->Execute(&result);
 			if (result == Pl_Changed)
@@ -1120,7 +1301,7 @@ bool CallIntGamerules(SendPropHookGamerules hook, int *ret)
 		{
 			ISendProxyCallbacks * pCallbacks = (ISendProxyCallbacks *)hook.sCallbackInfo.pCallback;
 			int iValue = *ret;
-			bool bChange = pCallbacks->OnGamerulesPropProxyFunctionCalls(hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&iValue, hook.PropType, hook.Element);
+			bool bChange = pCallbacks->OnGamerulesPropProxyFunctionCalls(hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&iValue, hook.PropType, iElement);
 			if (bChange)
 			{
 				*ret = iValue;
@@ -1132,13 +1313,16 @@ bool CallIntGamerules(SendPropHookGamerules hook, int *ret)
 	return false;
 }
 
-bool CallFloat(SendPropHook hook, float *ret)
+bool CallFloat(SendPropHook &hook, float *ret, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
 	
 	AUTO_LOCK_FM(g_WorkMutex);
 	
+	if (!hook.pVar->IsInsideArray())
+		iElement = hook.Element;
+
 	switch (hook.sCallbackInfo.iCallbackType)
 	{
 		case CallBackType::Callback_PluginFunction:
@@ -1149,7 +1333,7 @@ bool CallFloat(SendPropHook hook, float *ret)
 			callback->PushCell(hook.objectID);
 			callback->PushString(hook.pVar->GetName());
 			callback->PushFloatByRef(&value);
-			callback->PushCell(hook.Element);
+			callback->PushCell(iElement);
 			callback->PushCell(g_iCurrentClientIndexInLoop + 1);
 			callback->Execute(&result);
 			if (result == Pl_Changed)
@@ -1163,7 +1347,7 @@ bool CallFloat(SendPropHook hook, float *ret)
 		{
 			ISendProxyCallbacks * pCallbacks = (ISendProxyCallbacks *)hook.sCallbackInfo.pCallback;
 			float flValue = *ret;
-			bool bChange = pCallbacks->OnEntityPropProxyFunctionCalls(gameents->EdictToBaseEntity(hook.pEnt), hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&flValue, hook.PropType, hook.Element);
+			bool bChange = pCallbacks->OnEntityPropProxyFunctionCalls(gameents->EdictToBaseEntity(hook.pEnt), hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&flValue, hook.PropType, iElement);
 			if (bChange)
 			{
 				*ret = flValue;
@@ -1175,12 +1359,15 @@ bool CallFloat(SendPropHook hook, float *ret)
 	return false;
 }
 
-bool CallFloatGamerules(SendPropHookGamerules hook, float *ret)
+bool CallFloatGamerules(SendPropHookGamerules &hook, float *ret, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
 	
 	AUTO_LOCK_FM(g_WorkMutex);
+
+	if (!hook.pVar->IsInsideArray())
+		iElement = hook.Element;
 
 	switch (hook.sCallbackInfo.iCallbackType)
 	{
@@ -1191,7 +1378,7 @@ bool CallFloatGamerules(SendPropHookGamerules hook, float *ret)
 			cell_t result = Pl_Continue;
 			callback->PushString(hook.pVar->GetName());
 			callback->PushFloatByRef(&value);
-			callback->PushCell(hook.Element);
+			callback->PushCell(iElement);
 			callback->PushCell(g_iCurrentClientIndexInLoop + 1);
 			callback->Execute(&result);
 			if (result == Pl_Changed)
@@ -1205,7 +1392,7 @@ bool CallFloatGamerules(SendPropHookGamerules hook, float *ret)
 		{
 			ISendProxyCallbacks * pCallbacks = (ISendProxyCallbacks *)hook.sCallbackInfo.pCallback;
 			float flValue = *ret;
-			bool bChange = pCallbacks->OnGamerulesPropProxyFunctionCalls(hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&flValue, hook.PropType, hook.Element);
+			bool bChange = pCallbacks->OnGamerulesPropProxyFunctionCalls(hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&flValue, hook.PropType, iElement);
 			if (bChange)
 			{
 				*ret = flValue;
@@ -1217,12 +1404,15 @@ bool CallFloatGamerules(SendPropHookGamerules hook, float *ret)
 	return false;
 }
 
-bool CallString(SendPropHook hook, char **ret)
+bool CallString(SendPropHook &hook, char **ret, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
 	
 	AUTO_LOCK_FM(g_WorkMutex);
+
+	if (!hook.pVar->IsInsideArray())
+		iElement = hook.Element;
 
 	static char value[4096];
 	switch (hook.sCallbackInfo.iCallbackType)
@@ -1235,7 +1425,7 @@ bool CallString(SendPropHook hook, char **ret)
 			callback->PushCell(hook.objectID);
 			callback->PushString(hook.pVar->GetName());
 			callback->PushStringEx(value, 4096, SM_PARAM_STRING_UTF8 | SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
-			callback->PushCell(hook.Element);
+			callback->PushCell(iElement);
 			callback->PushCell(g_iCurrentClientIndexInLoop + 1);
 			callback->Execute(&result);
 			if (result == Pl_Changed)
@@ -1249,7 +1439,7 @@ bool CallString(SendPropHook hook, char **ret)
 		{
 			ISendProxyCallbacks * pCallbacks = (ISendProxyCallbacks *)hook.sCallbackInfo.pCallback;
 			strncpynull(value, *ret, 4096);
-			bool bChange = pCallbacks->OnEntityPropProxyFunctionCalls(gameents->EdictToBaseEntity(hook.pEnt), hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)value, hook.PropType, hook.Element);
+			bool bChange = pCallbacks->OnEntityPropProxyFunctionCalls(gameents->EdictToBaseEntity(hook.pEnt), hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)value, hook.PropType, iElement);
 			if (bChange)
 			{
 				*ret = value;
@@ -1261,12 +1451,15 @@ bool CallString(SendPropHook hook, char **ret)
 	return false;
 }
 
-bool CallStringGamerules(SendPropHookGamerules hook, char **ret)
+bool CallStringGamerules(SendPropHookGamerules &hook, char **ret, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
 	
 	AUTO_LOCK_FM(g_WorkMutex);
+
+	if (!hook.pVar->IsInsideArray())
+		iElement = hook.Element;
 
 	static char value[4096];
 	switch (hook.sCallbackInfo.iCallbackType)
@@ -1284,7 +1477,7 @@ bool CallStringGamerules(SendPropHookGamerules hook, char **ret)
 			cell_t result = Pl_Continue;
 			callback->PushString(hook.pVar->GetName());
 			callback->PushStringEx(value, 4096, SM_PARAM_STRING_UTF8 | SM_PARAM_STRING_COPY, SM_PARAM_COPYBACK);
-			callback->PushCell(hook.Element);
+			callback->PushCell(iElement);
 			callback->PushCell(g_iCurrentClientIndexInLoop + 1);
 			callback->Execute(&result);
 			if (result == Pl_Changed)
@@ -1301,7 +1494,7 @@ bool CallStringGamerules(SendPropHookGamerules hook, char **ret)
 				return false;
 			ISendProxyCallbacks * pCallbacks = (ISendProxyCallbacks *)hook.sCallbackInfo.pCallback;
 			strncpynull(value, *ret, 4096);
-			bool bChange = pCallbacks->OnGamerulesPropProxyFunctionCalls(hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)value, hook.PropType, hook.Element);
+			bool bChange = pCallbacks->OnGamerulesPropProxyFunctionCalls(hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)value, hook.PropType, iElement);
 			if (bChange)
 			{
 				*ret = value;
@@ -1313,12 +1506,15 @@ bool CallStringGamerules(SendPropHookGamerules hook, char **ret)
 	return false;
 }
 
-bool CallVector(SendPropHook hook, Vector &vec)
+bool CallVector(SendPropHook &hook, Vector &vec, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
 	
 	AUTO_LOCK_FM(g_WorkMutex);
+
+	if (!hook.pVar->IsInsideArray())
+		iElement = hook.Element;
 
 	switch (hook.sCallbackInfo.iCallbackType)
 	{
@@ -1335,7 +1531,7 @@ bool CallVector(SendPropHook hook, Vector &vec)
 			callback->PushCell(hook.objectID);
 			callback->PushString(hook.pVar->GetName());
 			callback->PushArray(vector, 3, SM_PARAM_COPYBACK);
-			callback->PushCell(hook.Element);
+			callback->PushCell(iElement);
 			callback->PushCell(g_iCurrentClientIndexInLoop + 1);
 			callback->Execute(&result);
 			if (result == Pl_Changed)
@@ -1351,7 +1547,7 @@ bool CallVector(SendPropHook hook, Vector &vec)
 		{
 			ISendProxyCallbacks * pCallbacks = (ISendProxyCallbacks *)hook.sCallbackInfo.pCallback;
 			Vector vNewVec(vec.x, vec.y, vec.z);
-			bool bChange = pCallbacks->OnGamerulesPropProxyFunctionCalls(hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&vNewVec, hook.PropType, hook.Element);
+			bool bChange = pCallbacks->OnGamerulesPropProxyFunctionCalls(hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&vNewVec, hook.PropType, iElement);
 			if (bChange)
 			{
 				vec.x = vNewVec.x;
@@ -1365,12 +1561,15 @@ bool CallVector(SendPropHook hook, Vector &vec)
 	return false;
 }
 
-bool CallVectorGamerules(SendPropHookGamerules hook, Vector &vec)
+bool CallVectorGamerules(SendPropHookGamerules &hook, Vector &vec, int iElement)
 {
 	if (!g_bSVComputePacksDone)
 		return false;
 	
 	AUTO_LOCK_FM(g_WorkMutex);
+
+	if (!hook.pVar->IsInsideArray())
+		iElement = hook.Element;
 
 	switch (hook.sCallbackInfo.iCallbackType)
 	{
@@ -1386,7 +1585,7 @@ bool CallVectorGamerules(SendPropHookGamerules hook, Vector &vec)
 			cell_t result = Pl_Continue;
 			callback->PushString(hook.pVar->GetName());
 			callback->PushArray(vector, 3, SM_PARAM_COPYBACK);
-			callback->PushCell(hook.Element);
+			callback->PushCell(iElement);
 			callback->PushCell(g_iCurrentClientIndexInLoop + 1);
 			callback->Execute(&result);
 			if (result == Pl_Changed)
@@ -1402,7 +1601,7 @@ bool CallVectorGamerules(SendPropHookGamerules hook, Vector &vec)
 		{
 			ISendProxyCallbacks * pCallbacks = (ISendProxyCallbacks *)hook.sCallbackInfo.pCallback;
 			Vector vNewVec(vec.x, vec.y, vec.z);
-			bool bChange = pCallbacks->OnGamerulesPropProxyFunctionCalls(hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&vNewVec, hook.PropType, hook.Element);
+			bool bChange = pCallbacks->OnGamerulesPropProxyFunctionCalls(hook.pVar, (CBasePlayer *)gamehelpers->ReferenceToEntity(g_iCurrentClientIndexInLoop + 1), (void *)&vNewVec, hook.PropType, iElement);
 			if (bChange)
 			{
 				vec.x = vNewVec.x;
@@ -1422,7 +1621,7 @@ void GlobalProxy(const SendProp *pProp, const void *pStructBase, const void * pD
 	bool bHandled = false;
 	for (int i = 0; i < g_Hooks.Count(); i++)
 	{
-		if (g_Hooks[i].objectID == objectID && g_Hooks[i].pVar == pProp && pEnt == g_Hooks[i].pEnt)
+		if (g_Hooks[i].objectID == objectID && g_Hooks[i].pVar == pProp && pEnt == g_Hooks[i].pEnt && (!pProp->IsInsideArray() || g_Hooks[i].Element == iElement))
 		{
 			switch (g_Hooks[i].PropType)
 			{
@@ -1430,7 +1629,7 @@ void GlobalProxy(const SendProp *pProp, const void *pStructBase, const void * pD
 				{
 					int result = *(int *)pData;
 
-					if (CallInt(g_Hooks[i], &result))
+					if (CallInt(g_Hooks[i], &result, iElement))
 					{
 						long data = result;
 						g_Hooks[i].pRealProxy(pProp, pStructBase, &data, pOut, iElement, objectID);
@@ -1447,7 +1646,7 @@ void GlobalProxy(const SendProp *pProp, const void *pStructBase, const void * pD
 				{
 					float result = *(float *)pData;
 
-					if (CallFloat(g_Hooks[i], &result))
+					if (CallFloat(g_Hooks[i], &result, iElement))
 					{
 						g_Hooks[i].pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
 						return; // If somebody already handled this call, do not call other hooks for this entity & prop
@@ -1461,13 +1660,13 @@ void GlobalProxy(const SendProp *pProp, const void *pStructBase, const void * pD
 				}
 				case PropType::Prop_String:
 				{
-					const char * result = *(char **)pData;
+					const char * result = (char*)pData;
 					if (!result) //there can be null;
 						result = "";
 
-					if (CallString(g_Hooks[i], const_cast<char **>(&result)))
+					if (CallString(g_Hooks[i], const_cast<char **>(&result), iElement))
 					{
-						g_Hooks[i].pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
+						g_Hooks[i].pRealProxy(pProp, pStructBase, result, pOut, iElement, objectID);
 						return; // If somebody already handled this call, do not call other hooks for this entity & prop
 					}
 					else
@@ -1481,7 +1680,7 @@ void GlobalProxy(const SendProp *pProp, const void *pStructBase, const void * pD
 				{
 					Vector result = *(Vector *)pData;
 
-					if (CallVector(g_Hooks[i], result))
+					if (CallVector(g_Hooks[i], result, iElement))
 					{
 						g_Hooks[i].pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
 						return; // If somebody already handled this call, do not call other hooks for this entity & prop
@@ -1516,10 +1715,11 @@ void GlobalProxyGamerules(const SendProp *pProp, const void *pStructBase, const 
 {
 	if (!g_bShouldChangeGameRulesState)
 		g_bShouldChangeGameRulesState = true; //If this called once, so, the props wants to be sent at this time, and we should do this for all clients!
+	
 	bool bHandled = false;
 	for (int i = 0; i < g_HooksGamerules.Count(); i++)
 	{
-		if (g_HooksGamerules[i].pVar == pProp)
+		if (g_HooksGamerules[i].pVar == pProp && (!pProp->IsInsideArray() || g_HooksGamerules[i].Element == iElement))
 		{
 			switch (g_HooksGamerules[i].PropType)
 			{
@@ -1527,7 +1727,7 @@ void GlobalProxyGamerules(const SendProp *pProp, const void *pStructBase, const 
 				{
 					int result = *(int *)pData;
 
-					if (CallIntGamerules(g_HooksGamerules[i], &result))
+					if (CallIntGamerules(g_HooksGamerules[i], &result, iElement))
 					{
 						long data = result;
 						g_HooksGamerules[i].pRealProxy(pProp, pStructBase, &data, pOut, iElement, objectID);
@@ -1544,7 +1744,7 @@ void GlobalProxyGamerules(const SendProp *pProp, const void *pStructBase, const 
 				{
 					float result = *(float *)pData;
 
-					if (CallFloatGamerules(g_HooksGamerules[i], &result))
+					if (CallFloatGamerules(g_HooksGamerules[i], &result, iElement))
 					{
 						g_HooksGamerules[i].pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
 						return; // If somebody already handled this call, do not call other hooks for this entity & prop
@@ -1558,13 +1758,13 @@ void GlobalProxyGamerules(const SendProp *pProp, const void *pStructBase, const 
 				}
 				case PropType::Prop_String:
 				{
-					const char * result = *(char **)pData; //We need to use const because of C++11 restriction
+					const char *result = (char*)pData; //We need to use const because of C++11 restriction
 					if (!result) //there can be null;
 						result = "";
 
-					if (CallStringGamerules(g_HooksGamerules[i], const_cast<char **>(&result)))
+					if (CallStringGamerules(g_HooksGamerules[i], const_cast<char **>(&result), iElement))
 					{
-						g_HooksGamerules[i].pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
+						g_HooksGamerules[i].pRealProxy(pProp, pStructBase, result, pOut, iElement, objectID);
 						return; // If somebody already handled this call, do not call other hooks for this entity & prop
 					}
 					else
@@ -1578,7 +1778,7 @@ void GlobalProxyGamerules(const SendProp *pProp, const void *pStructBase, const 
 				{
 					Vector result = *(Vector *)pData;
 
-					if (CallVectorGamerules(g_HooksGamerules[i], result))
+					if (CallVectorGamerules(g_HooksGamerules[i], result, iElement))
 					{
 						g_HooksGamerules[i].pRealProxy(pProp, pStructBase, &result, pOut, iElement, objectID);
 						return; // If somebody already handled this call, do not call other hooks for this entity & prop
@@ -1601,7 +1801,7 @@ void GlobalProxyGamerules(const SendProp *pProp, const void *pStructBase, const 
 		{
 			if (g_HooksGamerules[i].pVar == pProp)
 			{
-				g_Hooks[i].pRealProxy(pProp, pStructBase, pData, pOut, iElement, objectID);
+				g_HooksGamerules[i].pRealProxy(pProp, pStructBase, pData, pOut, iElement, objectID);
 				return;
 			}
 		}

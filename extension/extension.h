@@ -49,6 +49,7 @@
 #include <eiface.h>
 #include <ISDKHooks.h>
 #include <ISDKTools.h>
+#include "wrappers.h"
 
 #define GET_CONVAR(name) \
 	name = g_pCVar->FindVar(#name); \

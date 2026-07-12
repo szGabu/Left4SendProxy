@@ -1,3 +1,7 @@
+# Warning
+
+This repository is now deprecated. People looking for an updated SendProxy extension should look for [jensewe's fork](https://github.com/jensewe/Left4SendProxy). 
+
 # Left4SendProxy
 
 TheByKotik's SendProxy, which is a fork of Afronanny's SendProxy Manager [extension](https://forums.alliedmods.net/showthread.php?t=169795). This repository provides binaries for Left 4 Dead 2 through Github Actions.
